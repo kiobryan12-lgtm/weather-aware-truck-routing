@@ -220,7 +220,7 @@ _search_locks: dict[str, threading.Lock] = {}
 _search_locks_guard = threading.Lock()
 
 
-def analyze_trip_cached(trip: TripRequest) -> dict:
+def analyze_trip_cached(trip: TripRequest, providers: Providers = Providers()) -> dict:
     """Cache results and make concurrent identical searches wait for the first one (free API limits)."""
     cache_key = analysis_cache_key(trip)
     if (cached := cache.get(cache_key)) is not None:
@@ -232,7 +232,7 @@ def analyze_trip_cached(trip: TripRequest) -> dict:
         with search_lock:
             if (cached := cache.get(cache_key)) is not None:
                 return cached
-            result = analyze_trip(trip)
+            result = analyze_trip(trip, providers)
             cache.set(cache_key, result, ANALYSIS_CACHE_SECONDS)
             return result
     finally:
@@ -241,7 +241,24 @@ def analyze_trip_cached(trip: TripRequest) -> dict:
                 _search_locks.pop(cache_key, None)
 
 
-def analyze_trip(trip: TripRequest, providers: Providers = Providers()) -> dict:
+@dataclass(frozen=True)
+class TripPlan:
+    origin: geocoding.Place
+    destination: geocoding.Place
+    named_options: list[tuple[str, routing.RouteOption]]
+    checkpoint_plans: list[list[PlannedCheckpoint]]
+    checkpoint_cells: list[LngLat]
+    heatmap_points: list[LngLat]
+    forecast_start: datetime
+    forecast_end: datetime
+
+    @property
+    def forecast_points(self) -> list[LngLat]:
+        return list(dict.fromkeys([*self.checkpoint_cells, *self.heatmap_points]))
+
+
+def plan_trip(trip: TripRequest, providers: Providers = Providers()) -> TripPlan:
+    """Places, routes, checkpoints and the forecasts needed, before any weather is fetched."""
     with ThreadPoolExecutor(max_workers=2) as pool:
         origin, destination = pool.map(providers.resolve_place, (trip.origin, trip.destination))
 
@@ -254,45 +271,76 @@ def analyze_trip(trip: TripRequest, providers: Providers = Providers()) -> dict:
     named_options = order_and_name(
         providers.fetch_route_options(origin.location, destination.location), origin.location, destination.location
     )
-    plans = [plan_checkpoints(option, trip) for _, option in named_options]
-    latest_eta = max(checkpoint.eta for plan in plans for checkpoint in plan)
+    checkpoint_plans = [plan_checkpoints(option, trip) for _, option in named_options]
+    latest_eta = max(checkpoint.eta for plan in checkpoint_plans for checkpoint in plan)
 
     # Same forecast window for every search with this departure, so changing the load
     # or interval hits the cache.
-    checkpoint_cells = [snap_to_cell(checkpoint.location, settings.FORECAST_CELL_DEG) for plan in plans for checkpoint in plan]
-    spacing_deg = settings.WEATHER_GRID_SPACING_DEG
-    heatmap_points = grid_points([option.coordinates for _, option in named_options], spacing_deg)
     forecast_start = weather.floor_hour(trip.departure)
-    forecast_end = max(forecast_start + timedelta(hours=HEATMAP_HOURS), latest_eta)
-    forecast_points = list(dict.fromkeys([*checkpoint_cells, *heatmap_points]))
-    forecast_by_point = dict(
-        zip(forecast_points, providers.fetch_hourly_forecasts(forecast_points, forecast_start, forecast_end))
+    return TripPlan(
+        origin=origin,
+        destination=destination,
+        named_options=named_options,
+        checkpoint_plans=checkpoint_plans,
+        checkpoint_cells=[
+            snap_to_cell(checkpoint.location, settings.FORECAST_CELL_DEG)
+            for plan in checkpoint_plans
+            for checkpoint in plan
+        ],
+        heatmap_points=grid_points([option.coordinates for _, option in named_options], settings.WEATHER_GRID_SPACING_DEG),
+        forecast_start=forecast_start,
+        forecast_end=max(forecast_start + timedelta(hours=HEATMAP_HOURS), latest_eta),
     )
-    checkpoint_forecasts = [forecast_by_point[cell] for cell in checkpoint_cells]
-    heatmap_forecasts = [forecast_by_point[point] for point in heatmap_points]
+
+
+def forecast_request(trip: TripRequest, providers: Providers = Providers()) -> dict:
+    """The forecast locations and hours a client should fetch for this trip."""
+    plan = plan_trip(trip, providers)
+    window = weather.forecast_window(plan.forecast_start, plan.forecast_end)
+    if window is None:
+        return {"points": [], "start_time": None, "end_time": None}
+    first_hour, last_hour = window
+    return {
+        "points": [list(weather.point_key(point)) for point in plan.forecast_points],
+        "start_time": format_utc(first_hour),
+        "end_time": format_utc(last_hour),
+    }
+
+
+def analyze_trip(trip: TripRequest, providers: Providers = Providers()) -> dict:
+    plan = plan_trip(trip, providers)
+    forecast_points = plan.forecast_points
+    forecast_by_point = dict(
+        zip(forecast_points, providers.fetch_hourly_forecasts(forecast_points, plan.forecast_start, plan.forecast_end))
+    )
+    checkpoint_forecasts = [forecast_by_point[cell] for cell in plan.checkpoint_cells]
+    heatmap_forecasts = [forecast_by_point[point] for point in plan.heatmap_points]
     warnings = []
 
     routes = []
     offset = 0
-    for (name, option), plan in zip(named_options, plans):
-        forecasts = checkpoint_forecasts[offset : offset + len(plan)]
-        offset += len(plan)
-        routes.append(build_route(str(len(routes) + 1), name, option, plan, forecasts, trip.load_weight_lb))
+    for (name, option), checkpoints in zip(plan.named_options, plan.checkpoint_plans):
+        forecasts = checkpoint_forecasts[offset : offset + len(checkpoints)]
+        offset += len(checkpoints)
+        routes.append(build_route(str(len(routes) + 1), name, option, checkpoints, forecasts, trip.load_weight_lb))
 
     recommendation = rank_routes(routes)
     if all(forecast is None for forecast in checkpoint_forecasts):
-        warnings.append("The departure is beyond forecast range (about 16 days), so risk levels are Unknown.")
+        warnings.append("No forecast is available for this departure time, so risk levels are Unknown.")
 
+    spacing_deg = settings.WEATHER_GRID_SPACING_DEG
     has_heatmap = any(forecast is not None for forecast in heatmap_forecasts)
     return {
-        "origin": {"name": origin.name, "location": list(origin.location)},
-        "destination": {"name": destination.name, "location": list(destination.location)},
+        "origin": {"name": plan.origin.name, "location": list(plan.origin.location)},
+        "destination": {"name": plan.destination.name, "location": list(plan.destination.location)},
         "departure_time": format_utc(trip.departure),
         "load_weight_lb": trip.load_weight_lb,
         "checkpoint_interval_miles": trip.checkpoint_interval_miles,
         "routes": routes,
         "recommendation": recommendation,
-        "weather_grid": build_weather_grid(heatmap_points, heatmap_forecasts, forecast_start, spacing_deg) if has_heatmap else None,
+        "weather_grid": build_weather_grid(plan.heatmap_points, heatmap_forecasts, plan.forecast_start, spacing_deg)
+        if has_heatmap
+        else None,
         "warnings": warnings,
         "data_source": "live",
     }

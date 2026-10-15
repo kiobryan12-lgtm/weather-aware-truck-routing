@@ -5,11 +5,11 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from .services.analysis import analyze_trip_cached
+from .services.analysis import Providers, analyze_trip_cached, forecast_request
 from .services.geocoding import GeocodingError, search_places
 from .services.http import UpstreamError
 from .services.routing import RoutingError
-from .services.validation import ValidationError, parse_trip_request
+from .services.validation import ValidationError, parse_supplied_forecasts, parse_trip_request
 
 logger = logging.getLogger(__name__)
 
@@ -23,16 +23,14 @@ def health(request):
     return JsonResponse({"status": "ok"})
 
 
-@csrf_exempt
-@require_POST
-def analyze_routes(request):
+def handle_trip_request(request, build_response):
     try:
         payload = json.loads(request.body or b"null")
     except json.JSONDecodeError:
         return error_response(400, "Request body must be valid JSON.")
 
     try:
-        return JsonResponse(analyze_trip_cached(parse_trip_request(payload)))
+        return JsonResponse(build_response(payload))
     except (ValidationError, GeocodingError) as error:
         return error_response(400, str(error))
     except RoutingError as error:
@@ -42,6 +40,27 @@ def analyze_routes(request):
     except Exception:
         logger.exception("Route analysis failed")
         return error_response(500, "Something went wrong while analyzing routes. Please try again.")
+
+
+@csrf_exempt
+@require_POST
+def plan_routes(request):
+    """Which forecasts the browser should fetch for this trip."""
+    return handle_trip_request(request, lambda payload: forecast_request(parse_trip_request(payload)))
+
+
+@csrf_exempt
+@require_POST
+def analyze_routes(request):
+    """Full analysis. Uses forecasts sent by the browser when present, otherwise fetches them."""
+
+    def analyze(payload):
+        trip = parse_trip_request(payload)
+        supplied = parse_supplied_forecasts(payload.get("forecasts"))
+        providers = Providers(fetch_hourly_forecasts=supplied) if supplied else Providers()
+        return analyze_trip_cached(trip, providers)
+
+    return handle_trip_request(request, analyze)
 
 
 @require_GET

@@ -25,10 +25,14 @@ In mock mode the header shows a "Sample data" badge, since the routes and weathe
 
 ## API
 
-- `POST /api/routes/analyze`: request and response types are in [`src/types/routing.ts`](src/types/routing.ts).
+- `POST /api/routes/plan`: which forecast locations and hours to fetch for a trip.
+- `POST /api/routes/analyze`: the trip plus those forecasts; returns routes, risk and the recommendation.
+  Types are in [`src/types/routing.ts`](src/types/routing.ts).
 - `GET /api/locations/search?q=`: place suggestions for the origin and destination fields.
 
-Risk levels and the recommendation come from the backend; the frontend only displays them.
+The browser downloads the forecasts from Open-Meteo itself ([`src/services/weatherClient.ts`](src/services/weatherClient.ts)),
+so each visitor uses their own free allowance instead of the hosting server's shared IP. Risk levels and the
+recommendation still come from the backend; the frontend only displays them.
 [`src/data/mock/`](src/data/mock/) returns the same response shape with fake data, which was used to build the
 UI before the backend existed.
 

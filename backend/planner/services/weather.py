@@ -54,17 +54,38 @@ def floor_hour(moment: datetime) -> datetime:
     return moment.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
 
 
-def fetch_hourly_forecasts(points: Sequence[LngLat], start: datetime, end: datetime) -> list[HourlyForecast | None]:
-    """One forecast per point for [start, end], or None if it's past the forecast range."""
+def forecast_window(start: datetime, end: datetime) -> tuple[datetime, datetime] | None:
+    """First and last forecast hour to request, or None if the trip is past the forecast range."""
     first_hour = floor_hour(start)
     last_available_hour = floor_hour(datetime.now(UTC)) + timedelta(days=FORECAST_DAYS) - ONE_HOUR
     last_hour = min(floor_hour(end) + ONE_HOUR, last_available_hour)
-    if first_hour > last_hour:
-        return [None] * len(points)
+    return (first_hour, last_hour) if first_hour <= last_hour else None
 
-    rounded = [(round(lng, 2), round(lat, 2)) for lng, lat in points]
-    window = f"{first_hour:%Y%m%d%H}-{last_hour:%Y%m%d%H}"
-    keys = [f"weather:{lng},{lat}:{window}" for lng, lat in rounded]
+
+def point_key(point: LngLat) -> tuple[float, float]:
+    return (round(point[0], 2), round(point[1], 2))
+
+
+class SuppliedForecasts:
+    """Forecasts the browser fetched itself, looked up with the same rounding as server fetches."""
+
+    def __init__(self, forecasts_by_point: dict[tuple[float, float], HourlyForecast]):
+        self.forecasts_by_point = forecasts_by_point
+
+    def __call__(self, points: Sequence[LngLat], start: datetime, end: datetime) -> list[HourlyForecast | None]:
+        return [self.forecasts_by_point.get(point_key(point)) for point in points]
+
+
+def fetch_hourly_forecasts(points: Sequence[LngLat], start: datetime, end: datetime) -> list[HourlyForecast | None]:
+    """One forecast per point for [start, end], or None if it's past the forecast range."""
+    window = forecast_window(start, end)
+    if window is None:
+        return [None] * len(points)
+    first_hour, last_hour = window
+
+    rounded = [point_key(point) for point in points]
+    window_key = f"{first_hour:%Y%m%d%H}-{last_hour:%Y%m%d%H}"
+    keys = [f"weather:{lng},{lat}:{window_key}" for lng, lat in rounded]
     forecasts = cache.get_many(keys)
 
     missing = list(dict.fromkeys((key, point) for key, point in zip(keys, rounded) if key not in forecasts))

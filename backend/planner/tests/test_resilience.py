@@ -46,7 +46,7 @@ class SearchDeduplicationTests(SimpleTestCase):
     def test_concurrent_identical_searches_run_the_analysis_once(self):
         calls = []
 
-        def slow_analysis(trip):
+        def slow_analysis(trip, providers):
             calls.append(trip)
             time.sleep(0.2)
             return {"routes": []}

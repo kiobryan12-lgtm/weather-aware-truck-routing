@@ -1,5 +1,6 @@
-import type { AnalyzeResponse, LocationSuggestion, TripRequest } from '../types/routing';
+import type { AnalyzeResponse, ForecastPlan, LocationSuggestion, TripRequest } from '../types/routing';
 import { ApiError } from './apiError';
+import { fetchForecasts } from './weatherClient';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -38,9 +39,16 @@ export async function analyzeRoutes(trip: TripRequest, signal?: AbortSignal): Pr
     const { mockAnalyzeRoutes } = await import('../data/mock/mockRouting');
     return mockAnalyzeRoutes(trip, signal);
   }
-  return requestJson<AnalyzeResponse>('/api/routes/analyze', {
+  // 1. ask which forecasts are needed, 2. fetch them here, 3. send them back for the risk analysis
+  const plan = await requestJson<ForecastPlan>('/api/routes/plan', {
     method: 'POST',
     body: JSON.stringify(trip),
+    signal,
+  });
+  const forecasts = await fetchForecasts(plan, signal);
+  return requestJson<AnalyzeResponse>('/api/routes/analyze', {
+    method: 'POST',
+    body: JSON.stringify({ ...trip, forecasts: forecasts ?? { points: [] } }),
     signal,
   });
 }

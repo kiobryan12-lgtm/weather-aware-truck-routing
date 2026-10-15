@@ -110,3 +110,20 @@ export interface LocationSuggestion {
   detail: string;
   location: LngLat;
 }
+
+// Response of POST /api/routes/plan: the forecasts the browser should fetch
+export interface ForecastPlan {
+  points: LngLat[];
+  start_time: string | null;
+  end_time: string | null;
+}
+
+// Hourly series per point, sent back with POST /api/routes/analyze
+export interface SuppliedForecasts {
+  start_time: string;
+  points: LngLat[];
+  wind_mph: (number | null)[][];
+  rain_in: (number | null)[][];
+  snow_in: (number | null)[][];
+  cloud_pct: (number | null)[][];
+}

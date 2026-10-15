@@ -19,6 +19,7 @@ No database or API keys are needed.
 
 | Method | Path | Purpose |
 |---|---|---|
+| `POST` | `/api/routes/plan` | Forecast locations and hours the browser should fetch for a trip |
 | `POST` | `/api/routes/analyze` | Routes, checkpoints, risk, recommendation and the 48-hour heatmap grid |
 | `GET` | `/api/locations/search?q=` | US place suggestions for the trip form |
 | `GET` | `/api/health` | Health check |
@@ -47,9 +48,12 @@ Errors return `{"detail": "..."}` with status 400 (invalid input or unknown plac
 3. **Truck travel time:** OSRM car times with every road segment capped at 65 mph (`TRUCK_MAX_SPEED_MPH`).
 4. **Checkpoints:** every 10, 25 or 50 miles plus the destination. Each ETA is the departure time plus the
    truck travel time to that point.
-5. **Weather:** Open-Meteo hourly forecast at each checkpoint, rounded to 0.05° (~3 mi), close to the
-   forecast models' own resolution. Wind is interpolated to the exact ETA; rain and snow use the hour
-   containing the ETA. The heatmap uses a 1° grid within 75 miles of the routes.
+5. **Weather:** the browser fetches the Open-Meteo hourly forecast itself and sends it with the analyze
+   request, because Open-Meteo limits free use per IP address and hosting servers share theirs with many
+   other apps. Without supplied forecasts the API fetches them itself. Forecasts are taken at each
+   checkpoint, rounded to 0.05° (~3 mi), close to the forecast models' own resolution. Wind is interpolated
+   to the exact ETA; rain and snow use the hour containing the ETA. The heatmap uses a 1° grid within
+   75 miles of the routes.
 6. **Risk:** each condition is classified, the worst one wins, then load rules may raise wind risk.
 7. **Ranking:** routes with any No Travel miles are excluded; the rest are ranked by fewest Severe miles,
    fewest High miles, lowest average risk, then shortest travel time.
