@@ -88,10 +88,13 @@ export function TripForm({ loading, onSubmit, submitOnMount = false }: TripFormP
   const isValid = Object.keys(errors).length === 0;
   const timeZone = useMemo(localTimeZoneLabel, []);
 
-  const mountSubmitRef = useRef({ submitOnMount, values, onSubmit });
+  // React StrictMode runs effects twice in development; the flag keeps this to one request.
+  const mountSubmitRef = useRef({ submitOnMount, values, onSubmit, submitted: false });
   useEffect(() => {
-    const { submitOnMount: shouldSubmit, values: initial, onSubmit: submit } = mountSubmitRef.current;
-    if (shouldSubmit && Object.keys(validate(initial)).length === 0) submit(toRequest(initial));
+    const mount = mountSubmitRef.current;
+    if (mount.submitted || !mount.submitOnMount || Object.keys(validate(mount.values)).length > 0) return;
+    mount.submitted = true;
+    mount.onSubmit(toRequest(mount.values));
   }, []);
 
   const setField = <K extends keyof FormValues>(key: K, value: FormValues[K]) => setValues((current) => ({ ...current, [key]: value }));

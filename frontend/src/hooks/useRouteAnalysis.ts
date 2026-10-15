@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { AnalyzeResponse, TripRequest } from '../types/routing';
 import { analyzeRoutes } from '../services/routingApi';
 import { toUserMessage } from '../services/apiError';
@@ -36,7 +36,6 @@ export function useRouteAnalysis() {
     if (lastRequestRef.current) void analyze(lastRequestRef.current);
   }, [analyze]);
 
-  useEffect(() => () => controllerRef.current?.abort(), []);
 
   return { ...state, analyze, retry };
 }
