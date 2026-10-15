@@ -63,4 +63,4 @@ OPEN_METEO_GEOCODING_URL = os.environ.get(
 )
 TRUCK_MAX_SPEED_MPH = float(os.environ.get("TRUCK_MAX_SPEED_MPH", "65"))
 WEATHER_GRID_SPACING_DEG = float(os.environ.get("WEATHER_GRID_SPACING_DEG", "1.0"))
-FORECAST_CELL_DEG = float(os.environ.get("FORECAST_CELL_DEG", "0.25"))
+FORECAST_CELL_DEG = float(os.environ.get("FORECAST_CELL_DEG", "0.05"))
