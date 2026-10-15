@@ -28,13 +28,23 @@ const RADAR_RAMP: [number, string][] = [
   [1, '#DC2626'],
 ];
 
+/** Weight 0.25 is the Moderate threshold, so Low conditions stay clear. */
+const COMBINED_RAMP: [number, string][] = [
+  [0.2, 'rgba(96,165,250,0)'],
+  [0.27, '#60A5FA'],
+  [0.45, '#22C55E'],
+  [0.6, '#FACC15'],
+  [0.78, '#F97316'],
+  [1, '#DC2626'],
+];
+
 export const WEATHER_LAYERS: Record<WeatherLayer, WeatherLayerConfig> = {
   combined: {
     title: 'Weather (Combined Intensity)',
     prefix: 'x',
     stops: [0, 0.25, 0.5, 0.75, 1],
-    ramp: RADAR_RAMP,
-    lowLabel: 'Light',
+    ramp: COMBINED_RAMP,
+    lowLabel: 'Moderate',
     highLabel: 'Severe',
   },
   precipitation: {
