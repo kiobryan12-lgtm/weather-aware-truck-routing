@@ -44,6 +44,13 @@ def point_at_distance(line: Sequence[LngLat], cumulative: Sequence[float], miles
     return (lng, lat)
 
 
+def sample_along(line: Sequence[LngLat], every_miles: float) -> list[LngLat]:
+    """Evenly spaced points from start to end, about `every_miles` apart."""
+    cumulative = cumulative_miles(line)
+    steps = max(1, int(cumulative[-1] // every_miles))
+    return [point_at_distance(line, cumulative, cumulative[-1] * step / steps) for step in range(steps + 1)]
+
+
 def slice_line(line: Sequence[LngLat], cumulative: Sequence[float], start_miles: float, end_miles: float) -> list[LngLat]:
     points = [point_at_distance(line, cumulative, start_miles)]
     points.extend(point for point, miles in zip(line, cumulative) if start_miles < miles < end_miles)

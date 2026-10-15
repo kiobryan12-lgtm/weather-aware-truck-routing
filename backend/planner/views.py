@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from .services.analysis import analyze_trip
+from .services.analysis import analyze_trip_cached
 from .services.geocoding import GeocodingError, search_places
 from .services.http import UpstreamError
 from .services.routing import RoutingError
@@ -32,13 +32,13 @@ def analyze_routes(request):
         return error_response(400, "Request body must be valid JSON.")
 
     try:
-        return JsonResponse(analyze_trip(parse_trip_request(payload)))
+        return JsonResponse(analyze_trip_cached(parse_trip_request(payload)))
     except (ValidationError, GeocodingError) as error:
         return error_response(400, str(error))
     except RoutingError as error:
         return error_response(422, str(error))
     except UpstreamError as error:
-        return error_response(502, error.message)
+        return error_response(503 if error.is_rate_limited else 502, error.message)
     except Exception:
         logger.exception("Route analysis failed")
         return error_response(500, "Something went wrong while analyzing routes. Please try again.")

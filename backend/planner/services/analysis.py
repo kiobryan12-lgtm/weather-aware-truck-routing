@@ -1,4 +1,5 @@
-import logging
+import hashlib
+import json
 import math
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -6,19 +7,28 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 
 from . import geocoding, routing, weather
-from .geo import LngLat, bounds, haversine_miles, interpolate_along, point_at_distance, simplify, slice_line
-from .http import UpstreamError
+from .geo import (
+    LngLat,
+    bounds,
+    haversine_miles,
+    interpolate_along,
+    point_at_distance,
+    sample_along,
+    simplify,
+    slice_line,
+)
 from .risk import UNKNOWN, UNKNOWN_RISK, evaluate_checkpoint, rank_routes, summarize_risk
 from .validation import TripRequest, ValidationError
 
-logger = logging.getLogger(__name__)
-
 MAX_TRIP_MILES = 1500
 HEATMAP_HOURS = 48
-GRID_PADDING_DEG = 1.5
+CORRIDOR_RADIUS_MILES = 75
+GRID_PADDING_DEG = 1.25
 GEOMETRY_TOLERANCE_DEG = 0.0008
+ANALYSIS_CACHE_SECONDS = 10 * 60
 ROUTE_NAMES_BY_COUNT = {
     1: ("Direct",),
     2: ("{first}", "{last}"),
@@ -163,15 +173,19 @@ def build_route(
 
 
 def grid_points(lines: Sequence[Sequence[LngLat]], spacing_deg: float) -> list[LngLat]:
-    """Regular grid over the padded trip area; latitude spacing shrinks so cells are square on the map."""
+    """Grid cells within the trip corridor; latitude spacing shrinks so cells are square on the map."""
     west, south, east, north = bounds(lines)
     lat_spacing = spacing_deg * math.cos(math.radians((south + north) / 2))
     columns = math.floor((east - west + 2 * GRID_PADDING_DEG) / spacing_deg) + 1
     rows = math.floor((north - south + 2 * GRID_PADDING_DEG) / lat_spacing) + 1
-    return [
+    route_samples = [point for line in lines for point in sample_along(line, every_miles=10)]
+    cells = (
         (round(west - GRID_PADDING_DEG + column * spacing_deg, 4), round(south - GRID_PADDING_DEG + row * lat_spacing, 4))
         for row in range(rows)
         for column in range(columns)
+    )
+    return [
+        cell for cell in cells if any(haversine_miles(cell, sample) <= CORRIDOR_RADIUS_MILES for sample in route_samples)
     ]
 
 
@@ -196,6 +210,25 @@ def build_weather_grid(
     }
 
 
+def snap_to_cell(point: LngLat, cell_deg: float) -> LngLat:
+    return (round(round(point[0] / cell_deg) * cell_deg, 4), round(round(point[1] / cell_deg) * cell_deg, 4))
+
+
+def analysis_cache_key(trip: TripRequest) -> str:
+    fields = [trip.origin.lower(), trip.destination.lower(), trip.departure.isoformat(), trip.load_weight_lb, trip.checkpoint_interval_miles]
+    return "analysis:" + hashlib.sha1(json.dumps(fields).encode()).hexdigest()
+
+
+def analyze_trip_cached(trip: TripRequest) -> dict:
+    """Repeated identical searches are served from cache to stay within free API limits."""
+    cache_key = analysis_cache_key(trip)
+    if (cached := cache.get(cache_key)) is not None:
+        return cached
+    result = analyze_trip(trip)
+    cache.set(cache_key, result, ANALYSIS_CACHE_SECONDS)
+    return result
+
+
 def analyze_trip(trip: TripRequest, providers: Providers = Providers()) -> dict:
     with ThreadPoolExecutor(max_workers=2) as pool:
         origin, destination = pool.map(providers.resolve_place, (trip.origin, trip.destination))
@@ -210,26 +243,22 @@ def analyze_trip(trip: TripRequest, providers: Providers = Providers()) -> dict:
         providers.fetch_route_options(origin.location, destination.location), origin.location, destination.location
     )
     plans = [plan_checkpoints(option, trip) for _, option in named_options]
-    checkpoint_locations = [checkpoint.location for plan in plans for checkpoint in plan]
     latest_eta = max(checkpoint.eta for plan in plans for checkpoint in plan)
 
+    # Checkpoints share forecasts within a model-scale cell, and every request for this
+    # departure uses the same window, so changing the load or interval reuses cached data.
+    checkpoint_cells = [snap_to_cell(checkpoint.location, settings.FORECAST_CELL_DEG) for plan in plans for checkpoint in plan]
     spacing_deg = settings.WEATHER_GRID_SPACING_DEG
     heatmap_points = grid_points([option.coordinates for _, option in named_options], spacing_deg)
-    heatmap_start = weather.floor_hour(trip.departure)
+    forecast_start = weather.floor_hour(trip.departure)
+    forecast_end = max(forecast_start + timedelta(hours=HEATMAP_HOURS), latest_eta)
+    forecast_points = list(dict.fromkeys([*checkpoint_cells, *heatmap_points]))
+    forecast_by_point = dict(
+        zip(forecast_points, providers.fetch_hourly_forecasts(forecast_points, forecast_start, forecast_end))
+    )
+    checkpoint_forecasts = [forecast_by_point[cell] for cell in checkpoint_cells]
+    heatmap_forecasts = [forecast_by_point[point] for point in heatmap_points]
     warnings = []
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        checkpoint_request = pool.submit(providers.fetch_hourly_forecasts, checkpoint_locations, trip.departure, latest_eta)
-        heatmap_request = pool.submit(
-            providers.fetch_hourly_forecasts, heatmap_points, heatmap_start, heatmap_start + timedelta(hours=HEATMAP_HOURS)
-        )
-        checkpoint_forecasts = checkpoint_request.result()
-        try:
-            heatmap_forecasts = heatmap_request.result()
-        except UpstreamError:
-            logger.exception("Heatmap forecast failed")
-            heatmap_forecasts = None
-            warnings.append("The weather heatmap is temporarily unavailable. Route risk is unaffected.")
 
     routes = []
     offset = 0
@@ -242,7 +271,7 @@ def analyze_trip(trip: TripRequest, providers: Providers = Providers()) -> dict:
     if all(forecast is None for forecast in checkpoint_forecasts):
         warnings.append("The departure is beyond forecast range (about 16 days), so risk levels are Unknown.")
 
-    has_heatmap = heatmap_forecasts is not None and any(forecast is not None for forecast in heatmap_forecasts)
+    has_heatmap = any(forecast is not None for forecast in heatmap_forecasts)
     return {
         "origin": {"name": origin.name, "location": list(origin.location)},
         "destination": {"name": destination.name, "location": list(destination.location)},
@@ -251,7 +280,7 @@ def analyze_trip(trip: TripRequest, providers: Providers = Providers()) -> dict:
         "checkpoint_interval_miles": trip.checkpoint_interval_miles,
         "routes": routes,
         "recommendation": recommendation,
-        "weather_grid": build_weather_grid(heatmap_points, heatmap_forecasts, heatmap_start, spacing_deg) if has_heatmap else None,
+        "weather_grid": build_weather_grid(heatmap_points, heatmap_forecasts, forecast_start, spacing_deg) if has_heatmap else None,
         "warnings": warnings,
         "data_source": "live",
     }

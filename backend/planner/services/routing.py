@@ -5,7 +5,7 @@ from itertools import pairwise
 from django.conf import settings
 from django.core.cache import cache
 
-from .geo import LngLat, cumulative_miles, haversine_miles, offset_point, point_at_distance
+from .geo import LngLat, cumulative_miles, haversine_miles, offset_point, sample_along
 from .http import UpstreamError, get_json
 
 DETOUR_OFFSETS = (0.2, -0.2, 0.35, -0.35)
@@ -122,16 +122,8 @@ def road_summary(legs: list[dict]) -> str:
     return " · ".join(roads) or "Local roads"
 
 
-def _sample(option: RouteOption, every_miles: float) -> list[LngLat]:
-    steps = max(1, int(option.distance_miles // every_miles))
-    return [
-        point_at_distance(option.coordinates, option.cumulative_miles, option.distance_miles * step / steps)
-        for step in range(steps + 1)
-    ]
-
-
 def _overlaps(candidate: RouteOption, existing: RouteOption) -> bool:
-    samples = _sample(candidate, every_miles=5)
-    reference = _sample(existing, every_miles=2)
+    samples = sample_along(candidate.coordinates, every_miles=5)
+    reference = sample_along(existing.coordinates, every_miles=2)
     shared = sum(1 for point in samples if any(haversine_miles(point, other) <= OVERLAP_RADIUS_MILES for other in reference))
     return shared / len(samples) > MAX_OVERLAP_SHARE

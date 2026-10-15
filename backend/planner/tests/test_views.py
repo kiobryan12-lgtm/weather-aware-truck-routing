@@ -32,7 +32,7 @@ class AnalyzeViewTests(SimpleTestCase):
     def post(self, body):
         return self.client.post(ANALYZE_URL, data=body, content_type="application/json")
 
-    @patch("planner.views.analyze_trip", return_value={"routes": []})
+    @patch("planner.views.analyze_trip_cached", return_value={"routes": []})
     def test_valid_request_returns_analysis(self, analyze_trip):
         response = self.post(json.dumps(valid_payload()))
         self.assertEqual(response.status_code, 200)
@@ -56,10 +56,11 @@ class AnalyzeViewTests(SimpleTestCase):
             (GeocodingError("Not found"), 400),
             (RoutingError("No route"), 422),
             (UpstreamError("Weather down"), 502),
+            (UpstreamError("Limit reached", status=429), 503),
             (RuntimeError("boom"), 500),
         ]
         for error, status in cases:
-            with self.subTest(error=error), patch("planner.views.analyze_trip", side_effect=error):
+            with self.subTest(error=error), patch("planner.views.analyze_trip_cached", side_effect=error):
                 response = self.post(json.dumps(valid_payload()))
                 self.assertEqual(response.status_code, status)
                 self.assertNotIn("boom", response.json()["detail"])

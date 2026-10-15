@@ -2,8 +2,8 @@ from datetime import UTC, datetime, timedelta
 
 from django.test import SimpleTestCase, override_settings
 
-from planner.services.analysis import Providers, analyze_trip, checkpoint_mileposts, grid_points
-from planner.services.geo import cumulative_miles
+from planner.services.analysis import Providers, analyze_trip, checkpoint_mileposts, grid_points, snap_to_cell
+from planner.services.geo import cumulative_miles, haversine_miles, sample_along
 from planner.services.geocoding import Place
 from planner.services.routing import RouteOption
 from planner.services.validation import TripRequest, ValidationError, parse_trip_request
@@ -99,11 +99,17 @@ class HelperTests(SimpleTestCase):
         self.assertEqual(checkpoint_mileposts(60, 25), [0, 25, 50, 60])
         self.assertEqual(checkpoint_mileposts(50.4, 25), [0, 25, 50.4])
 
-    def test_grid_covers_padded_bounds(self):
-        points = grid_points([[(-100, 39), (-98, 40)]], spacing_deg=1.0)
-        lngs = {lng for lng, _ in points}
-        self.assertEqual(min(lngs), -101.5)
-        self.assertGreaterEqual(max(lngs), -97)
+    def test_grid_only_covers_the_route_corridor(self):
+        route = [(-100.0, 39.0), (-96.0, 39.0)]
+        points = grid_points([route], spacing_deg=0.5)
+        self.assertTrue(points)
+        for point in points:
+            self.assertLessEqual(min(haversine_miles(point, sample) for sample in sample_along(route, 10)), 75)
+        self.assertNotIn((-101.25, 37.75), points)
+
+    def test_snap_to_cell_shares_nearby_checkpoints(self):
+        self.assertEqual(snap_to_cell((-99.98, 39.11), 0.25), snap_to_cell((-100.07, 39.05), 0.25))
+        self.assertEqual(snap_to_cell((-99.98, 39.11), 0.25), (-100.0, 39.0))
 
 
 class ValidationTests(SimpleTestCase):

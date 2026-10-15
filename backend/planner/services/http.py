@@ -6,7 +6,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-RETRY_STATUSES = {429, 502, 503, 504}
+TOO_MANY_REQUESTS = 429
+RETRY_STATUSES = {502, 503, 504}
 
 _client = httpx.Client(
     timeout=httpx.Timeout(20.0, connect=10.0),
@@ -23,6 +24,10 @@ class UpstreamError(Exception):
         self.status = status
         self.payload = payload
 
+    @property
+    def is_rate_limited(self) -> bool:
+        return self.status == TOO_MANY_REQUESTS
+
 
 def get_json(url: str, *, params: dict[str, Any] | None = None, service: str) -> Any:
     for attempt in range(2):
@@ -34,6 +39,13 @@ def get_json(url: str, *, params: dict[str, Any] | None = None, service: str) ->
                 continue
             raise UpstreamError(f"The {service} service is unreachable. Please try again.") from error
 
+        if response.status_code == TOO_MANY_REQUESTS:
+            # Free-tier limits reset per minute, so retrying immediately would fail again.
+            logger.warning("%s rate limit reached", service)
+            raise UpstreamError(
+                f"The {service} service's free usage limit was reached. Please wait a minute and try again.",
+                TOO_MANY_REQUESTS,
+            )
         if response.status_code in RETRY_STATUSES and attempt == 0:
             time.sleep(1)
             continue
