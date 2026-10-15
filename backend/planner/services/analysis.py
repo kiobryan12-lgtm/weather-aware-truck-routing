@@ -1,6 +1,7 @@
 import hashlib
 import json
 import math
+import threading
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -219,14 +220,32 @@ def analysis_cache_key(trip: TripRequest) -> str:
     return "analysis:" + hashlib.sha1(json.dumps(fields).encode()).hexdigest()
 
 
+_search_locks: dict[str, threading.Lock] = {}
+_search_locks_guard = threading.Lock()
+
+
 def analyze_trip_cached(trip: TripRequest) -> dict:
-    """Repeated identical searches are served from cache to stay within free API limits."""
+    """
+    Identical searches are served from cache, and concurrent identical searches wait for the
+    first one instead of calling the providers again, to stay within free API limits.
+    """
     cache_key = analysis_cache_key(trip)
     if (cached := cache.get(cache_key)) is not None:
         return cached
-    result = analyze_trip(trip)
-    cache.set(cache_key, result, ANALYSIS_CACHE_SECONDS)
-    return result
+
+    with _search_locks_guard:
+        search_lock = _search_locks.setdefault(cache_key, threading.Lock())
+    try:
+        with search_lock:
+            if (cached := cache.get(cache_key)) is not None:
+                return cached
+            result = analyze_trip(trip)
+            cache.set(cache_key, result, ANALYSIS_CACHE_SECONDS)
+            return result
+    finally:
+        with _search_locks_guard:
+            if not search_lock.locked():
+                _search_locks.pop(cache_key, None)
 
 
 def analyze_trip(trip: TripRequest, providers: Providers = Providers()) -> dict:

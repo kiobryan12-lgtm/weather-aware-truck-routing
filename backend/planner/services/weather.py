@@ -13,7 +13,7 @@ from .risk import Conditions
 
 HOURLY_VARIABLES = ("wind_speed_10m", "rain", "snowfall", "cloud_cover")
 BATCH_SIZE = 100
-MAX_PARALLEL_REQUESTS = 4
+MAX_PARALLEL_REQUESTS = 2
 FORECAST_DAYS = 16
 CACHE_SECONDS = 30 * 60
 ONE_HOUR = timedelta(hours=1)
