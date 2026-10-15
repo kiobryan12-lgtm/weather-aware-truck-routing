@@ -6,16 +6,19 @@ React + TypeScript + Vite + Tailwind CSS v4 + MapLibre GL client for the Weather
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # http://127.0.0.1:5173 (start the backend first)
 npm run build      # type-check + production build
 ```
 
-## Data source
+## Configuration
+
+Set these in `.env.local` (see [`.env.example`](.env.example)):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `VITE_DATA_SOURCE` | `mock` | `mock` serves simulated sample data; `api` calls the Django backend |
-| `VITE_API_BASE_URL` | *(empty)* | Backend origin. Empty uses the `/api` dev proxy to `localhost:8000` |
+| `VITE_DATA_SOURCE` | `api` | `api` calls the Django backend; `mock` serves simulated sample data |
+| `VITE_API_BASE_URL` | *(empty)* | Backend origin for production builds. Empty uses the dev proxy |
+| `API_PROXY_TARGET` | `http://127.0.0.1:8000` | Where the dev server forwards `/api` requests |
 | `VITE_MAP_STYLE_URL` | CARTO Voyager | Any MapLibre style URL |
 
 Sample mode is clearly labelled in the UI. Its routes and weather are **simulated**, not forecasts.
