@@ -19,19 +19,48 @@ async function readErrorMessage(response: Response): Promise<string> {
     : 'The request could not be processed. Check your trip details and try again.';
 }
 
-async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      ...init,
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...init.headers },
+// The free backend sleeps when idle and briefly refuses connections while it starts.
+const RETRY_DELAYS_MS = [2000, 4000, 8000];
+const WAKING_STATUSES = new Set([502, 503, 504]);
+
+const isAbort = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
+
+function wait(milliseconds: number, signal?: AbortSignal | null): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, milliseconds);
+    signal?.addEventListener('abort', () => {
+      clearTimeout(timer);
+      reject(new DOMException('Aborted', 'AbortError'));
     });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') throw error;
-    throw new ApiError("Can't reach the routing service. Check your connection and try again.");
+  });
+}
+
+async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    const canRetry = attempt < RETRY_DELAYS_MS.length;
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        ...init,
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...init.headers },
+      });
+    } catch (error) {
+      if (isAbort(error)) throw error;
+      if (canRetry) {
+        await wait(RETRY_DELAYS_MS[attempt], init.signal);
+        continue;
+      }
+      throw new ApiError("Can't reach the routing service. Check your connection and try again.");
+    }
+    // Render's own error page while starting has no JSON body.
+    const isStartupPage = WAKING_STATUSES.has(response.status) && !response.headers.get('content-type')?.includes('json');
+    if (isStartupPage && canRetry) {
+      await wait(RETRY_DELAYS_MS[attempt], init.signal);
+      continue;
+    }
+    if (!response.ok) throw new ApiError(await readErrorMessage(response), response.status);
+    return (await response.json()) as T;
   }
-  if (!response.ok) throw new ApiError(await readErrorMessage(response), response.status);
-  return (await response.json()) as T;
 }
 
 export async function analyzeRoutes(trip: TripRequest, signal?: AbortSignal): Promise<AnalyzeResponse> {

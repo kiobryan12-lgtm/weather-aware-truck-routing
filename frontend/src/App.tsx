@@ -28,7 +28,7 @@ function riskiestCheckpoint(route: RouteResult | undefined): Checkpoint | null {
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export default function App() {
-  const { status, data, error, analyze, retry } = useRouteAnalysis();
+  const { status, data, error, isSlow, analyze, retry } = useRouteAnalysis();
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [selectedCheckpointId, setSelectedCheckpointId] = useState<string | null>(null);
   const [weatherLayer, setWeatherLayer] = useState<WeatherLayer>('combined');
@@ -87,6 +87,9 @@ export default function App() {
         <RouteMap
           data={data}
           loading={status === 'loading'}
+          loadingMessage={
+            isSlow ? 'Still working. The free server can take up to a minute to wake up.' : 'Analyzing routes and forecast…'
+          }
           selectedRouteId={selectedRouteId}
           selectedCheckpointId={selectedCheckpointId}
           weatherLayer={weatherLayer}

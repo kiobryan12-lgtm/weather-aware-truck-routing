@@ -1,9 +1,11 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AnalyzeResponse, TripRequest } from '../types/routing';
 import { analyzeRoutes } from '../services/routingApi';
 import { toUserMessage } from '../services/apiError';
 
 type AnalysisStatus = 'idle' | 'loading' | 'success' | 'error';
+
+const SLOW_REQUEST_MS = 8000;
 
 interface AnalysisState {
   status: AnalysisStatus;
@@ -14,6 +16,7 @@ interface AnalysisState {
 
 export function useRouteAnalysis() {
   const [state, setState] = useState<AnalysisState>({ status: 'idle', data: null, error: null });
+  const [isSlow, setIsSlow] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
   const lastRequestRef = useRef<TripRequest | null>(null);
 
@@ -32,9 +35,18 @@ export function useRouteAnalysis() {
     }
   }, []);
 
+  useEffect(() => {
+    if (state.status !== 'loading') {
+      setIsSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setIsSlow(true), SLOW_REQUEST_MS);
+    return () => clearTimeout(timer);
+  }, [state.status]);
+
   const retry = useCallback(() => {
     if (lastRequestRef.current) void analyze(lastRequestRef.current);
   }, [analyze]);
 
-  return { ...state, analyze, retry };
+  return { ...state, isSlow, analyze, retry };
 }

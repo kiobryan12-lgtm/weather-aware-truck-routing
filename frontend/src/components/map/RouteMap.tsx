@@ -49,6 +49,7 @@ type MapHit =
 interface RouteMapProps {
   data: AnalyzeResponse | null;
   loading: boolean;
+  loadingMessage: string;
   selectedRouteId: string | null;
   selectedCheckpointId: string | null;
   weatherLayer: WeatherLayer;
@@ -61,6 +62,7 @@ interface RouteMapProps {
 export function RouteMap({
   data,
   loading,
+  loadingMessage,
   selectedRouteId,
   selectedCheckpointId,
   weatherLayer,
@@ -346,7 +348,7 @@ export function RouteMap({
       {loading && (
         <div className="pointer-events-none absolute inset-0 flex items-start justify-center bg-white/40 pt-4">
           <div className="rounded-full border border-line bg-surface px-3 py-1.5 shadow-float">
-            <Spinner label="Analyzing routes and forecast…" />
+            <Spinner label={loadingMessage} />
           </div>
         </div>
       )}
