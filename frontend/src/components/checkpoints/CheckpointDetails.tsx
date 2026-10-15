@@ -1,10 +1,15 @@
 import type { ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, CloudRain, HelpCircle, Snowflake, Wind } from 'lucide-react';
-import type { Checkpoint, RiskLevel } from '../../types/routing';
+import { AlertTriangle, CheckCircle2, CloudRain, ExternalLink, HelpCircle, Snowflake, Wind } from 'lucide-react';
+import type { Checkpoint, LngLat, RiskLevel } from '../../types/routing';
 import { formatCoordinates, formatDateTime, formatDuration, formatMiles, formatRate, formatWind } from '../../lib/format';
 import { RISK_LABELS, RISK_TEXT_CLASSES, RISK_TINT_CLASSES } from '../../lib/risk';
 import { cn } from '../../lib/cn';
 import { RiskBadge } from '../routes/RiskBadge';
+
+/** Official US National Weather Service point forecast, for independently checking the data. */
+function nwsForecastUrl([lng, lat]: LngLat): string {
+  return `https://forecast.weather.gov/MapClick.php?lat=${lat.toFixed(4)}&lon=${lng.toFixed(4)}`;
+}
 
 interface CheckpointDetailsProps {
   checkpoint: Checkpoint | null;
@@ -67,6 +72,16 @@ export function CheckpointDetails({ checkpoint, departureTime }: CheckpointDetai
           {checkpoint.place_name && ` (${checkpoint.place_name})`}
         </DetailRow>
       </dl>
+      <a
+        href={nwsForecastUrl(checkpoint.location)}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2 inline-flex items-center gap-1 text-label font-semibold text-primary underline-offset-2 hover:underline"
+      >
+        Compare with weather.gov forecast
+        <ExternalLink className="size-3.5" aria-hidden />
+        <span className="sr-only">(opens in a new tab)</span>
+      </a>
 
       <div className="mt-4 grid grid-cols-3 gap-2">
         <WeatherTile icon={<Wind aria-hidden />} label="Wind" value={formatWind(weather.wind_mph)} level={levels.wind} />
