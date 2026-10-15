@@ -19,8 +19,9 @@ async function readErrorMessage(response: Response): Promise<string> {
     : 'The request could not be processed. Check your trip details and try again.';
 }
 
-// The free backend sleeps when idle and briefly refuses connections while it starts.
-const RETRY_DELAYS_MS = [2000, 4000, 8000];
+// The free backend sleeps when idle and can take a minute or two to start again.
+const WAKE_UP_LIMIT_MS = 120_000;
+const MAX_RETRY_DELAY_MS = 8000;
 const WAKING_STATUSES = new Set([502, 503, 504]);
 
 const isAbort = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
@@ -35,9 +36,12 @@ function wait(milliseconds: number, signal?: AbortSignal | null): Promise<void> 
   });
 }
 
+const retryDelay = (attempt: number) => Math.min(2000 * 2 ** attempt, MAX_RETRY_DELAY_MS);
+
 async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
+  const startedAt = Date.now();
   for (let attempt = 0; ; attempt++) {
-    const canRetry = attempt < RETRY_DELAYS_MS.length;
+    const canRetry = Date.now() - startedAt + retryDelay(attempt) < WAKE_UP_LIMIT_MS;
     let response: Response;
     try {
       response = await fetch(`${API_BASE_URL}${path}`, {
@@ -47,7 +51,7 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
     } catch (error) {
       if (isAbort(error)) throw error;
       if (canRetry) {
-        await wait(RETRY_DELAYS_MS[attempt], init.signal);
+        await wait(retryDelay(attempt), init.signal);
         continue;
       }
       throw new ApiError("Can't reach the routing service. Check your connection and try again.");
@@ -55,7 +59,7 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
     // Render's own error page while starting has no JSON body.
     const isStartupPage = WAKING_STATUSES.has(response.status) && !response.headers.get('content-type')?.includes('json');
     if (isStartupPage && canRetry) {
-      await wait(RETRY_DELAYS_MS[attempt], init.signal);
+      await wait(retryDelay(attempt), init.signal);
       continue;
     }
     if (!response.ok) throw new ApiError(await readErrorMessage(response), response.status);

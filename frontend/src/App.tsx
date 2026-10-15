@@ -142,7 +142,7 @@ export default function App() {
           data={data}
           loading={status === 'loading'}
           loadingMessage={
-            isSlow ? 'Still working. The free server can take up to a minute to wake up.' : 'Analyzing routes and forecast…'
+            isSlow ? 'Waking up the server. On the free hosting plan the first search can take a minute or two.' : 'Analyzing routes and forecast…'
           }
           selectedRouteId={selectedRouteId}
           selectedCheckpointId={selectedCheckpointId}
