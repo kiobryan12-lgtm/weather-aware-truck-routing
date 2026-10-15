@@ -1,7 +1,7 @@
 import type { ExpressionSpecification } from 'maplibre-gl';
 import type { WeatherVariable } from '../../types/routing';
 
-/** "combined" shows the strongest of rain, wind, and snow. */
+/** "combined" shows the strongest of rain, snow, and (Moderate or stronger) wind. */
 export type WeatherLayer = 'combined' | WeatherVariable;
 
 type ThresholdStops = [number, number, number, number, number];
@@ -10,31 +10,21 @@ interface WeatherLayerConfig {
   title: string;
   /** Hour `h` is stored as the property `${prefix}${h}`. */
   prefix: string;
-  /** Values at heatmap weights 0, 0.25, 0.5, 0.75, and 1. */
+  /** Values at weights 0, 0.25, 0.5, 0.75, and 1 (risk thresholds where they exist). */
   stops: ThresholdStops;
-  /** [heatmap density, color] pairs. */
+  /** [weight, color] pairs; the first stop is transparent. */
   ramp: [number, string][];
   lowLabel: string;
   highLabel: string;
 }
 
 const RADAR_RAMP: [number, string][] = [
-  [0.04, 'rgba(147,197,253,0)'],
-  [0.1, '#93C5FD'],
+  [0.02, 'rgba(147,197,253,0)'],
+  [0.07, '#93C5FD'],
   [0.25, '#3B82F6'],
   [0.45, '#22C55E'],
   [0.65, '#FACC15'],
   [0.82, '#F97316'],
-  [1, '#DC2626'],
-];
-
-/** Weight 0.25 is the Moderate threshold, so Low conditions stay clear. */
-const COMBINED_RAMP: [number, string][] = [
-  [0.2, 'rgba(96,165,250,0)'],
-  [0.27, '#60A5FA'],
-  [0.45, '#22C55E'],
-  [0.6, '#FACC15'],
-  [0.78, '#F97316'],
   [1, '#DC2626'],
 ];
 
@@ -43,8 +33,8 @@ export const WEATHER_LAYERS: Record<WeatherLayer, WeatherLayerConfig> = {
     title: 'Weather (Combined Intensity)',
     prefix: 'x',
     stops: [0, 0.25, 0.5, 0.75, 1],
-    ramp: COMBINED_RAMP,
-    lowLabel: 'Moderate',
+    ramp: RADAR_RAMP,
+    lowLabel: 'Light',
     highLabel: 'Severe',
   },
   precipitation: {
@@ -75,8 +65,8 @@ export const WEATHER_LAYERS: Record<WeatherLayer, WeatherLayerConfig> = {
     prefix: 's',
     stops: [0, 0.5, 1, 2, 3],
     ramp: [
-      [0.04, 'rgba(199,210,254,0)'],
-      [0.12, '#E0E7FF'],
+      [0.01, 'rgba(199,210,254,0)'],
+      [0.05, '#E0E7FF'],
       [0.3, '#A5B4FC'],
       [0.55, '#6366F1'],
       [0.8, '#4338CA'],
@@ -111,7 +101,7 @@ export const WEATHER_LAYER_OPTIONS: { value: WeatherLayer; label: string }[] = [
 
 const STOP_WEIGHTS = [0, 0.25, 0.5, 0.75, 1];
 
-/** JS equivalent of `heatWeightExpression`. */
+/** JS equivalent of the weight part of `heatColorExpression`. */
 export function valueToWeight(stops: ThresholdStops, value: number | null): number {
   if (value === null || value <= stops[0]) return 0;
   for (let i = 1; i < stops.length; i++) {
@@ -123,9 +113,15 @@ export function valueToWeight(stops: ThresholdStops, value: number | null): numb
   return 1;
 }
 
-export function heatWeightExpression(config: WeatherLayerConfig, hour: number): ExpressionSpecification {
+/** Weight at which a layer's colour starts to show. */
+export function visibleFromWeight(config: WeatherLayerConfig): number {
+  return (config.ramp[0][0] + config.ramp[1][0]) / 2;
+}
+
+/** Colour for each grid cell at `hour`, from its value mapped onto the layer's ramp. */
+export function heatColorExpression(config: WeatherLayerConfig, hour: number): ExpressionSpecification {
   const [minimum, low, middle, high, maximum] = config.stops;
-  return [
+  const weight: ExpressionSpecification = [
     'interpolate',
     ['linear'],
     ['coalesce', ['get', `${config.prefix}${hour}`], minimum],
@@ -135,24 +131,15 @@ export function heatWeightExpression(config: WeatherLayerConfig, hour: number): 
     high, 0.75,
     maximum, 1,
   ];
-}
-
-export function heatColorExpression(config: WeatherLayerConfig): ExpressionSpecification {
-  return [
-    'interpolate',
-    ['linear'],
-    ['heatmap-density'],
-    0, 'rgba(255,255,255,0)',
-    ...config.ramp.flat(),
-  ] as ExpressionSpecification;
+  return ['interpolate', ['linear'], weight, 0, 'rgba(255,255,255,0)', ...config.ramp.flat()] as ExpressionSpecification;
 }
 
 /** CSS gradient matching the ramp, without its transparent first stop. */
 export function legendGradient(config: WeatherLayerConfig): string {
   const visibleStops = config.ramp.slice(1);
-  const firstDensity = visibleStops[0][0];
+  const firstWeight = visibleStops[0][0];
   const cssStops = visibleStops.map(
-    ([density, color]) => `${color} ${(((density - firstDensity) / (1 - firstDensity)) * 100).toFixed(0)}%`,
+    ([weight, color]) => `${color} ${(((weight - firstWeight) / (1 - firstWeight)) * 100).toFixed(0)}%`,
   );
   return `linear-gradient(to right, ${cssStops.join(', ')})`;
 }

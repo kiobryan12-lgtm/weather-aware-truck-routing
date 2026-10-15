@@ -11,7 +11,7 @@ import { Spinner } from '../common/LoadingState';
 import { addRouteLayers, applyHeatGridSpacing, applyRouteSelection, LAYERS, SOURCES } from './mapLayers';
 import { checkpointsToGeoJSON, routesToGeoJSON, weatherGridToGeoJSON } from './mapData';
 import type { CheckpointFeatureProps, RouteFeatureProps } from './mapData';
-import { heatColorExpression, heatWeightExpression, WEATHER_LAYERS } from './weatherLayers';
+import { heatColorExpression, WEATHER_LAYERS } from './weatherLayers';
 import type { WeatherLayer } from './weatherLayers';
 
 const STYLE_URL = import.meta.env.VITE_MAP_STYLE_URL || 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
@@ -303,9 +303,7 @@ export function RouteMap({
         map.setLayoutProperty(LAYERS.heat, 'visibility', 'none');
         return;
       }
-      const config = WEATHER_LAYERS[weatherLayer];
-      map.setPaintProperty(LAYERS.heat, 'heatmap-color', heatColorExpression(config));
-      map.setPaintProperty(LAYERS.heat, 'heatmap-weight', heatWeightExpression(config, forecastHour));
+      map.setPaintProperty(LAYERS.heat, 'circle-color', heatColorExpression(WEATHER_LAYERS[weatherLayer], forecastHour));
       map.setLayoutProperty(LAYERS.heat, 'visibility', 'visible');
     });
     return () => cancelAnimationFrame(heatmapFrameRef.current);

@@ -46,15 +46,18 @@ export function addRouteLayers(map: MapLibreMap): void {
 
   // Below basemap labels so place names stay readable.
   const firstSymbolLayer = map.getStyle().layers.find((layer) => layer.type === 'symbol')?.id;
+  // Soft circles coloured by each cell's own value, so isolated weather keeps its true intensity.
   map.addLayer(
     {
       id: LAYERS.heat,
-      type: 'heatmap',
+      type: 'circle',
       source: SOURCES.heat,
       maxzoom: HEAT_MAX_ZOOM,
       layout: { visibility: 'none' },
       paint: {
-        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], HEAT_MAX_ZOOM - 1, 0.75, HEAT_MAX_ZOOM, 0],
+        'circle-blur': 1,
+        'circle-opacity': ['interpolate', ['linear'], ['zoom'], HEAT_MAX_ZOOM - 1, 0.8, HEAT_MAX_ZOOM, 0],
+        'circle-pitch-alignment': 'map',
       },
     },
     firstSymbolLayer,
@@ -136,19 +139,16 @@ export function applyRouteSelection(map: MapLibreMap, routeId: string): void {
   map.setFilter(LAYERS.checkpointsSelected, matchesRoute(routeId));
 }
 
-/** Radius follows grid spacing at every zoom; intensity normalizes density to ≈ weight. */
+/** Circle radius follows the grid spacing at every zoom so neighbouring cells blend into a continuous field. */
 export function applyHeatGridSpacing(map: MapLibreMap, spacingDeg: number): void {
-  const RADIUS_TO_SPACING = 2;
+  const RADIUS_TO_SPACING = 1.3;
   // 512px tiles: pixels per degree of longitude at zoom 0.
   const radiusAtZoom0 = RADIUS_TO_SPACING * spacingDeg * (512 / 360);
-  map.setPaintProperty(LAYERS.heat, 'heatmap-radius', [
+  map.setPaintProperty(LAYERS.heat, 'circle-radius', [
     'interpolate',
     ['exponential', 2],
     ['zoom'],
     0, radiusAtZoom0,
     HEAT_MAX_ZOOM, radiusAtZoom0 * 2 ** HEAT_MAX_ZOOM,
   ]);
-  // Integral of MapLibre's Gaussian kernel (σ = radius / 3) over one grid cell.
-  const kernelSum = 0.3989423 * 2 * Math.PI * (RADIUS_TO_SPACING / 3) ** 2;
-  map.setPaintProperty(LAYERS.heat, 'heatmap-intensity', 1 / kernelSum);
 }

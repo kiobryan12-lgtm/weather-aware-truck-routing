@@ -2,6 +2,7 @@ import type { FeatureCollection, LineString, Point } from 'geojson';
 import type { RouteResult, WeatherGrid, WeatherVariable } from '../../types/routing';
 import { routeColor } from '../../styles/tokens';
 import { valueToWeight, WEATHER_LAYERS } from './weatherLayers';
+import type { WeatherLayer } from './weatherLayers';
 
 export interface RouteFeatureProps {
   route_id: string;
@@ -55,7 +56,33 @@ export function checkpointsToGeoJSON(routes: RouteResult[]): FeatureCollection<P
   };
 }
 
-const RISK_VARIABLES: WeatherVariable[] = ['precipitation', 'wind', 'snow'];
+/** Wind joins the combined layer only from the Moderate threshold, so ordinary breezes don't tint the map. */
+const MODERATE_WIND_MPH = 25;
+
+function valueAt(grid: WeatherGrid, variable: WeatherVariable, hour: number, pointIndex: number): number | null {
+  return grid.values[variable][hour]?.[pointIndex] ?? null;
+}
+
+function combinedWeight(grid: WeatherGrid, hour: number, pointIndex: number): number {
+  const wind = valueAt(grid, 'wind', hour, pointIndex);
+  return Math.max(
+    valueToWeight(WEATHER_LAYERS.precipitation.stops, valueAt(grid, 'precipitation', hour, pointIndex)),
+    valueToWeight(WEATHER_LAYERS.snow.stops, valueAt(grid, 'snow', hour, pointIndex)),
+    wind !== null && wind >= MODERATE_WIND_MPH ? valueToWeight(WEATHER_LAYERS.wind.stops, wind) : 0,
+  );
+}
+
+function layerWeight(grid: WeatherGrid, layer: WeatherLayer, hour: number, pointIndex: number): number {
+  if (layer === 'combined') return combinedWeight(grid, hour, pointIndex);
+  return valueToWeight(WEATHER_LAYERS[layer].stops, valueAt(grid, layer, hour, pointIndex));
+}
+
+/** Strongest weight anywhere on the grid for each forecast hour. */
+export function peakWeightByHour(grid: WeatherGrid, layer: WeatherLayer): number[] {
+  return Array.from({ length: grid.hour_count }, (_, hour) =>
+    grid.points.reduce((peak, _point, pointIndex) => Math.max(peak, layerWeight(grid, layer, hour, pointIndex)), 0),
+  );
+}
 
 /** One point per cell holding every hourly value, so the slider only changes paint. */
 export function weatherGridToGeoJSON(grid: WeatherGrid | null): FeatureCollection<Point, Record<string, number | null>> {
@@ -66,14 +93,10 @@ export function weatherGridToGeoJSON(grid: WeatherGrid | null): FeatureCollectio
     features: grid.points.map((point, pointIndex) => {
       const properties: Record<string, number | null> = {};
       for (let hour = 0; hour < grid.hour_count; hour++) {
-        let combinedWeight = 0;
         for (const variable of variables) {
-          const layerConfig = WEATHER_LAYERS[variable];
-          const value = grid.values[variable][hour]?.[pointIndex] ?? null;
-          properties[`${layerConfig.prefix}${hour}`] = value;
-          if (RISK_VARIABLES.includes(variable)) combinedWeight = Math.max(combinedWeight, valueToWeight(layerConfig.stops, value));
+          properties[`${WEATHER_LAYERS[variable].prefix}${hour}`] = valueAt(grid, variable, hour, pointIndex);
         }
-        properties[`${WEATHER_LAYERS.combined.prefix}${hour}`] = Math.round(combinedWeight * 1000) / 1000;
+        properties[`${WEATHER_LAYERS.combined.prefix}${hour}`] = Math.round(combinedWeight(grid, hour, pointIndex) * 1000) / 1000;
       }
       return { type: 'Feature', geometry: { type: 'Point', coordinates: point }, properties };
     }),

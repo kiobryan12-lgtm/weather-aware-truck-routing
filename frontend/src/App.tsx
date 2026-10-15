@@ -11,6 +11,8 @@ import { MapLayerControls } from './components/map/MapLayerControls';
 import { MapLegend } from './components/map/MapLegend';
 import { ForecastBadge, ForecastSlider } from './components/map/ForecastSlider';
 import type { WeatherLayer } from './components/map/weatherLayers';
+import { visibleFromWeight, WEATHER_LAYERS } from './components/map/weatherLayers';
+import { peakWeightByHour } from './components/map/mapData';
 import { RouteComparison } from './components/routes/RouteComparison';
 import { CheckpointTable } from './components/checkpoints/CheckpointTable';
 import { CheckpointDetails } from './components/checkpoints/CheckpointDetails';
@@ -62,7 +64,20 @@ export default function App() {
   };
 
   const weatherGrid = data?.weather_grid ?? null;
-  const legendContent = weatherGrid ? <MapLegend layer={weatherLayer} /> : null;
+  const peakWeights = useMemo(
+    () => (weatherGrid ? peakWeightByHour(weatherGrid, weatherLayer) : []),
+    [weatherGrid, weatherLayer],
+  );
+  const visibleFrom = visibleFromWeight(WEATHER_LAYERS[weatherLayer]);
+  const strongestWeight = Math.max(0, ...peakWeights);
+  const legendContent = weatherGrid ? (
+    <MapLegend
+      layer={weatherLayer}
+      hasWeatherNow={(peakWeights[forecastHour] ?? 0) >= visibleFrom}
+      strongestHour={strongestWeight >= visibleFrom ? peakWeights.indexOf(strongestWeight) : null}
+      onShowHour={setForecastHour}
+    />
+  ) : null;
 
   return (
     <DashboardLayout
