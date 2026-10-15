@@ -54,8 +54,9 @@ def fetch_route_options(origin: LngLat, destination: LngLat, count: int = 3) -> 
     for across in DETOUR_OFFSETS:
         if len(options) >= count:
             break
-        via = offset_point(origin, destination, along=0.5, across=across)
-        for candidate in _request_routes([origin, via, destination], alternatives=0):
+        # Two shifted points keep the whole route to one side instead of a loop out and back.
+        detour = [offset_point(origin, destination, along=along, across=across) for along in (1 / 3, 2 / 3)]
+        for candidate in _request_routes([origin, *detour, destination], alternatives=0):
             if candidate.distance_miles <= longest_allowed and not any(_overlaps(candidate, other) for other in options):
                 options.append(candidate)
 
