@@ -18,7 +18,18 @@ if not SECRET_KEY:
     raise RuntimeError("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false.")
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
+# Render sets this to the service's public hostname.
+if render_hostname := os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(render_hostname)
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173")
+
+# HTTPS is terminated (and enforced) by the hosting proxy, so no SSL redirect here;
+# it would also break the host's plain-HTTP health checks.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_HSTS_SECONDS = 0 if DEBUG else 3600
+CSRF_COOKIE_SECURE = not DEBUG
+# Subdomain/preload HSTS don't apply to a shared host domain like onrender.com.
+SILENCED_SYSTEM_CHECKS = ["security.W005", "security.W008", "security.W021"]
 
 INSTALLED_APPS = [
     "corsheaders",
@@ -29,6 +40,8 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

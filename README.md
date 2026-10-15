@@ -39,6 +39,18 @@ npm run dev                     # http://127.0.0.1:5173
 If port 8000 is taken, run the backend on another port (`python manage.py runserver 8001`) and set
 `API_PROXY_TARGET=http://127.0.0.1:8001` in `frontend/.env.local`.
 
+## Deploy
+
+Backend on [Render](https://render.com) (free web service), frontend on [Vercel](https://vercel.com).
+
+1. **Render:** New > Blueprint > pick this repository. [`render.yaml`](render.yaml) sets up the service.
+   Leave `CORS_ALLOWED_ORIGINS` empty for now and copy the service URL once it's live.
+2. **Vercel:** Add New > Project > import this repository, set **Root Directory** to `frontend`, and add the
+   environment variable `VITE_API_BASE_URL` = the Render URL. Deploy and copy the site URL.
+3. **Render:** set `CORS_ALLOWED_ORIGINS` to the Vercel URL (no trailing slash) and save.
+
+Render's free tier sleeps after 15 minutes without traffic, so the first request after that takes up to a minute.
+
 ## Data sources
 
 | Need | Provider |
