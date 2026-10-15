@@ -1,4 +1,4 @@
-# Truck Route Planner — Backend
+# Truck Route Planner: Backend
 
 Django API that finds three routes, samples the weather forecast at each checkpoint's estimated arrival time,
 classifies risk with the assessment rules, and recommends the safest route.
@@ -41,17 +41,17 @@ Errors return `{"detail": "..."}` with status 400 (invalid input or unknown plac
 
 ## How it works
 
-1. **Geocoding** — Open-Meteo geocoding, limited to US places.
-2. **Routing** — OSRM. When it returns fewer than three alternatives, more are found by routing through points
+1. **Geocoding:** Open-Meteo geocoding, limited to US places.
+2. **Routing:** OSRM. When it returns fewer than three alternatives, more are found by routing through points
    shifted to either side of the trip; near-duplicates and detours over 1.6× the fastest distance are dropped.
-3. **Truck travel time** — OSRM car times with every road segment capped at 65 mph (`TRUCK_MAX_SPEED_MPH`).
-4. **Checkpoints** — every 10, 25 or 50 miles plus the destination. Each ETA is the departure time plus the
+3. **Truck travel time:** OSRM car times with every road segment capped at 65 mph (`TRUCK_MAX_SPEED_MPH`).
+4. **Checkpoints:** every 10, 25 or 50 miles plus the destination. Each ETA is the departure time plus the
    truck travel time to that point.
-5. **Weather** — Open-Meteo hourly forecast at each checkpoint, rounded to 0.05° (~3 mi), close to the
+5. **Weather:** Open-Meteo hourly forecast at each checkpoint, rounded to 0.05° (~3 mi), close to the
    forecast models' own resolution. Wind is interpolated to the exact ETA; rain and snow use the hour
    containing the ETA. The heatmap uses a 1° grid within 75 miles of the routes.
-6. **Risk** — each condition is classified, the worst one wins, then load rules may raise wind risk.
-7. **Ranking** — routes with any No Travel miles are excluded; the rest are ranked by fewest Severe miles,
+6. **Risk:** each condition is classified, the worst one wins, then load rules may raise wind risk.
+7. **Ranking:** routes with any No Travel miles are excluded; the rest are ranked by fewest Severe miles,
    fewest High miles, lowest average risk, then shortest travel time.
 
 ## Interpretation notes
@@ -62,7 +62,7 @@ Errors return `{"detail": "..."}` with status 400 (invalid input or unknown plac
   40,000 lb is Severe. Wind of 55 mph or more is No Travel for any load.
 - Wind uses sustained 10 m wind speed, not gusts.
 - Each checkpoint represents the road halfway to its neighbours. Severe and High miles are the sum of those
-  stretches; average risk is distance-weighted with Low = 0 … No Travel = 4.
+  stretches; average risk is weighted by distance, from 0 (Low) to 4 (No Travel).
 - Forecasts reach about 16 days ahead. Checkpoints beyond that are Unknown, and a route without forecast
   data is not recommended.
 - Detour alternatives can use slower two-lane roads near the shifted points, so their travel times are

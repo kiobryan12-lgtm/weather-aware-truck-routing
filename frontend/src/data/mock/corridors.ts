@@ -17,7 +17,7 @@ export interface CorridorSpec {
 
 const waypoint = (name: string, lng: number, lat: number): NamedWaypoint => ({ name, location: [lng, lat] });
 
-/** Hand-traced along the real highway network. */
+// Waypoints follow the real highways.
 const DENVER_KANSAS_CITY_CORRIDORS: CorridorSpec[] = [
   {
     label: '1',
@@ -105,11 +105,11 @@ export function presetCorridors(origin: SamplePlace, destination: SamplePlace): 
   return null;
 }
 
-/** Three synthetic corridors: bowed to either side of the direct line, plus a direct one. */
+// Fallback for other city pairs: one route bowed to each side plus a straight one.
 export function genericCorridors(origin: SamplePlace, destination: SamplePlace): CorridorSpec[] {
   const [originLng, originLat] = origin.location;
   const [destinationLng, destinationLat] = destination.location;
-  // Scale longitude by cos(latitude) so offsets are equal in both directions.
+  // Scale longitude by cos(lat) so the offset is the same distance in both axes.
   const lngScale = Math.cos((((originLat + destinationLat) / 2) * Math.PI) / 180);
   const directionX = (destinationLng - originLng) * lngScale;
   const directionY = destinationLat - originLat;

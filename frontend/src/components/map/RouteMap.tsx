@@ -17,7 +17,7 @@ import type { WeatherLayer } from './weatherLayers';
 
 const STYLE_URL = import.meta.env.VITE_MAP_STYLE_URL || 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 
-/** Used if the basemap can't load, so routes still render. */
+// Fallback if the basemap can't be loaded, so the routes still show.
 const FALLBACK_STYLE: StyleSpecification = {
   version: 8,
   sources: {},
@@ -36,7 +36,7 @@ function createMarkerPin(color: string, labelSide: 'left' | 'right'): { element:
   element.innerHTML = `<svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true" style="display:block;filter:drop-shadow(0 1px 2px rgba(15,23,42,.35))"><path d="M12 22.5s7.5-6.4 7.5-12.5a7.5 7.5 0 1 0-15 0c0 6.1 7.5 12.5 7.5 12.5z" fill="${color}" stroke="#fff" stroke-width="2"/><circle cx="12" cy="10" r="2.75" fill="#fff"/></svg>`;
   const label = document.createElement('span');
   label.setAttribute('aria-hidden', 'true');
-  // Opaque, so it covers the basemap's own label for the same city.
+  // Solid background so it hides the basemap's own label for the same city.
   label.style.cssText = `position:absolute;top:4px;${labelSide === 'left' ? 'right' : 'left'}:28px;white-space:nowrap;font:700 12px/18px Inter,system-ui,sans-serif;color:#0F172A;background:#fff;padding:1px 7px;border-radius:6px;border:1px solid #E2E8F0;box-shadow:0 1px 3px rgba(15,23,42,.12)`;
   element.appendChild(label);
   return { element, label };
@@ -117,13 +117,13 @@ export function RouteMap({
       map.setStyle(FALLBACK_STYLE);
     });
     map.on('load', () => {
-      // Start the compact attribution collapsed.
+      // Compact attribution starts expanded by default.
       container.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
       addRouteLayers(map);
       setReady(true);
     });
 
-    // Trips usually head east: origin label on the left, destination on the right.
+    // Most trips head east, so origin label goes left and destination label right.
     const origin = createMarkerPin(MAP_COLORS.origin, 'left');
     const destination = createMarkerPin(MAP_COLORS.destination, 'right');
     markersRef.current = {
@@ -242,7 +242,7 @@ export function RouteMap({
       if (hit?.kind === 'checkpoint') handlersRef.current.onSelectCheckpoint(hit.props.route_id, hit.props.id);
       else if (hit?.kind === 'route') handlersRef.current.onSelectRoute(hit.props.route_id);
       else {
-        // Touch screens have no hover, so a tap reads the weather instead.
+        // No hover on touch screens, so show the weather on tap.
         const weatherText = weatherTextAt(event.lngLat);
         if (weatherText) showTooltip(weatherText, event.lngLat);
       }
@@ -301,7 +301,6 @@ export function RouteMap({
     }
   }, [ready, data]);
 
-  // Only filters change, so the camera stays where the user left it.
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
@@ -323,7 +322,7 @@ export function RouteMap({
     }
   }, [ready, selectedCheckpointId, data]);
 
-  // At most one heatmap update per frame while scrubbing.
+  // One update per frame while the slider is dragged.
   const hasGrid = Boolean(data?.weather_grid);
   useEffect(() => {
     const map = mapRef.current;
@@ -341,7 +340,7 @@ export function RouteMap({
 
   return (
     <div className="relative h-[400px] overflow-hidden rounded-card border border-line bg-surface-muted shadow-card md:h-[480px] lg:h-full lg:min-h-[500px]">
-      {/* MapLibre CSS forces position: relative here, so size it with h-full/w-full. */}
+      {/* maplibre-gl.css sets position: relative on this element, so absolute inset-0 doesn't work. */}
       <div ref={containerRef} className="h-full w-full" role="region" aria-label="Route map" />
 
       {loading && (

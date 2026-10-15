@@ -17,7 +17,7 @@ const formatFixed = (value: number | null, digits: number) => (value === null ? 
 export function CheckpointTable({ route, intervalMiles, selectedCheckpointId, onSelect }: CheckpointTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Scroll within the table only, never the page.
+  // Only scroll the table itself, not the page.
   useEffect(() => {
     const container = scrollRef.current;
     const row = container?.querySelector<HTMLTableRowElement>('tr[aria-current="true"]');

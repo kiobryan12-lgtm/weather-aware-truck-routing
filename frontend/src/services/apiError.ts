@@ -1,4 +1,3 @@
-/** Error whose message is safe to show to the user. */
 export class ApiError extends Error {
   readonly status: number | null;
 

@@ -24,7 +24,7 @@ export function LocationInput({ id, label, value, placeholder, error, icon, onCh
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  // Null until the user types, so picking a suggestion doesn't search again.
+  // Stays null after a suggestion is picked so it doesn't trigger another search.
   const [query, setQuery] = useState<string | null>(null);
   const blurTimerRef = useRef<number | undefined>(undefined);
 

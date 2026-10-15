@@ -5,7 +5,6 @@ from collections.abc import Sequence
 LngLat = tuple[float, float]
 
 EARTH_RADIUS_MILES = 3958.8
-MILES_PER_DEGREE = 69.17
 
 
 def haversine_miles(start: LngLat, end: LngLat) -> float:
@@ -27,7 +26,6 @@ def _segment_index(cumulative: Sequence[float], miles: float) -> int:
 
 
 def interpolate_along(cumulative: Sequence[float], values: Sequence[float], miles: float) -> float:
-    """Value at `miles`, linearly interpolated between the vertices' `values`."""
     if miles <= 0:
         return values[0]
     if miles >= cumulative[-1]:
@@ -45,7 +43,6 @@ def point_at_distance(line: Sequence[LngLat], cumulative: Sequence[float], miles
 
 
 def sample_along(line: Sequence[LngLat], every_miles: float) -> list[LngLat]:
-    """Evenly spaced points from start to end, about `every_miles` apart."""
     cumulative = cumulative_miles(line)
     steps = max(1, int(cumulative[-1] // every_miles))
     return [point_at_distance(line, cumulative, cumulative[-1] * step / steps) for step in range(steps + 1)]
@@ -59,7 +56,7 @@ def slice_line(line: Sequence[LngLat], cumulative: Sequence[float], start_miles:
 
 
 def simplify(line: Sequence[LngLat], tolerance_deg: float) -> list[LngLat]:
-    """Ramer–Douglas–Peucker simplification; always keeps both endpoints."""
+    """Ramer-Douglas-Peucker. Keeps both endpoints."""
     if len(line) < 3:
         return list(line)
     keep = [False] * len(line)
@@ -86,14 +83,14 @@ def _perpendicular_distance(point: LngLat, start: LngLat, end: LngLat) -> float:
 
 
 def bounds(lines: Sequence[Sequence[LngLat]]) -> tuple[float, float, float, float]:
-    """(west, south, east, north) of all points."""
+    """Returns (west, south, east, north)."""
     lngs = [point[0] for line in lines for point in line]
     lats = [point[1] for line in lines for point in line]
     return min(lngs), min(lats), max(lngs), max(lats)
 
 
 def offset_point(origin: LngLat, destination: LngLat, along: float, across: float) -> LngLat:
-    """Point `along` the way from origin to destination, shifted sideways by `across` × trip length (left is positive)."""
+    """Point a fraction `along` the trip, moved sideways by `across` times the trip length (positive = left)."""
     lng_scale = math.cos(math.radians((origin[1] + destination[1]) / 2))
     dx = (destination[0] - origin[0]) * lng_scale
     dy = destination[1] - origin[1]

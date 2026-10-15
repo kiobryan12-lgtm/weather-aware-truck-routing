@@ -7,7 +7,7 @@ type AnalysisStatus = 'idle' | 'loading' | 'success' | 'error';
 
 interface AnalysisState {
   status: AnalysisStatus;
-  /** Kept while a new request loads so the map doesn't blank out. */
+  // Previous result is kept while loading so the map doesn't go blank.
   data: AnalyzeResponse | null;
   error: string | null;
 }
@@ -35,7 +35,6 @@ export function useRouteAnalysis() {
   const retry = useCallback(() => {
     if (lastRequestRef.current) void analyze(lastRequestRef.current);
   }, [analyze]);
-
 
   return { ...state, analyze, retry };
 }

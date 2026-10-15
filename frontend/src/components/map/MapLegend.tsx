@@ -3,9 +3,7 @@ import type { WeatherLayer } from './weatherLayers';
 
 interface MapLegendProps {
   layer: WeatherLayer;
-  /** Whether the layer shows anything at the selected hour. */
   hasWeatherNow: boolean;
-  /** Hour with the strongest weather in the window, or null when nothing shows at any hour. */
   strongestHour: number | null;
   onShowHour: (hour: number) => void;
 }

@@ -9,13 +9,13 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     build: {
       rollupOptions: {
-        // Separate long-cached chunk for the large map library.
+        // maplibre is big and rarely changes, keep it in its own chunk
         output: { manualChunks: { maplibre: ['maplibre-gl'] } },
       },
       chunkSizeWarningLimit: 1100,
     },
     server: {
-      // IPv4 explicitly: "localhost" can resolve to ::1 only on Windows.
+      // "localhost" resolved to ::1 only on Windows and the browser couldn't connect
       host: '127.0.0.1',
       port: 5173,
       proxy: { '/api': env.API_PROXY_TARGET || 'http://127.0.0.1:8000' },

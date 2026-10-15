@@ -38,15 +38,14 @@ const isSelected: ExpressionSpecification = ['boolean', ['feature-state', 'selec
 const matchesRoute = (routeId: string): ExpressionSpecification => ['==', ['get', 'route_id'], routeId];
 const excludesRoute = (routeId: string): ExpressionSpecification => ['!=', ['get', 'route_id'], routeId];
 
-/** Added once; later updates only change data, filters, and paint. */
 export function addRouteLayers(map: MapLibreMap): void {
   map.addSource(SOURCES.heat, { type: 'geojson', data: emptyCollection() });
   map.addSource(SOURCES.routes, { type: 'geojson', data: emptyCollection(), promoteId: 'route_id' });
   map.addSource(SOURCES.checkpoints, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
 
-  // Below basemap labels so place names stay readable.
+  // Added below the basemap labels so place names stay readable.
   const firstSymbolLayer = map.getStyle().layers.find((layer) => layer.type === 'symbol')?.id;
-  // Soft circles coloured by each cell's own value, so isolated weather keeps its true intensity.
+  // Blurred circles instead of a heatmap layer: the heatmap sums neighbours, which fades isolated cells.
   map.addLayer(
     {
       id: LAYERS.heat,
@@ -95,7 +94,7 @@ export function addRouteLayers(map: MapLibreMap): void {
     filter: matchesRoute(''),
     paint: { 'line-color': ['get', 'color'], 'line-width': 6 },
   });
-  // Invisible wide line for an easier hover and click target.
+  // Wide invisible line to make routes easier to hover and click.
   map.addLayer({
     id: LAYERS.routesHit,
     type: 'line',
@@ -115,7 +114,6 @@ export function addRouteLayers(map: MapLibreMap): void {
       'circle-stroke-width': 2,
     },
   });
-  // Selected route: dots filled by risk level.
   map.addLayer({
     id: LAYERS.checkpointsSelected,
     type: 'circle',
@@ -139,10 +137,10 @@ export function applyRouteSelection(map: MapLibreMap, routeId: string): void {
   map.setFilter(LAYERS.checkpointsSelected, matchesRoute(routeId));
 }
 
-/** Circle radius follows the grid spacing at every zoom so neighbouring cells blend into a continuous field. */
+// Radius scales with zoom so neighbouring cells always overlap.
 export function applyHeatGridSpacing(map: MapLibreMap, spacingDeg: number): void {
   const RADIUS_TO_SPACING = 1.3;
-  // 512px tiles: pixels per degree of longitude at zoom 0.
+  // Pixels per degree of longitude at zoom 0 (512px tiles).
   const radiusAtZoom0 = RADIUS_TO_SPACING * spacingDeg * (512 / 360);
   map.setPaintProperty(LAYERS.heat, 'circle-radius', [
     'interpolate',

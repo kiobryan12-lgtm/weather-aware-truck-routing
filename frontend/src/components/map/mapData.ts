@@ -56,7 +56,7 @@ export function checkpointsToGeoJSON(routes: RouteResult[]): FeatureCollection<P
   };
 }
 
-/** Wind joins the combined layer only from the Moderate threshold, so ordinary breezes don't tint the map. */
+// Wind below the Moderate threshold is left out of the combined layer so normal breezes don't tint the map.
 const MODERATE_WIND_MPH = 25;
 
 function valueAt(grid: WeatherGrid, variable: WeatherVariable, hour: number, pointIndex: number): number | null {
@@ -77,7 +77,6 @@ function layerWeight(grid: WeatherGrid, layer: WeatherLayer, hour: number, point
   return valueToWeight(WEATHER_LAYERS[layer].stops, valueAt(grid, layer, hour, pointIndex));
 }
 
-/** Nearest grid cell to a map position, or null outside the forecast area. */
 export function nearestGridPointIndex(grid: WeatherGrid, [lng, lat]: [number, number]): number | null {
   const lngScale = Math.cos((lat * Math.PI) / 180);
   let nearestIndex: number | null = null;
@@ -92,14 +91,12 @@ export function nearestGridPointIndex(grid: WeatherGrid, [lng, lat]: [number, nu
   return nearestDistance <= grid.spacing_deg * lngScale * 0.75 ? nearestIndex : null;
 }
 
-/** Strongest weight anywhere on the grid for each forecast hour. */
 export function peakWeightByHour(grid: WeatherGrid, layer: WeatherLayer): number[] {
   return Array.from({ length: grid.hour_count }, (_, hour) =>
     grid.points.reduce((peak, _point, pointIndex) => Math.max(peak, layerWeight(grid, layer, hour, pointIndex)), 0),
   );
 }
 
-/** One point per cell holding every hourly value, so the slider only changes paint. */
 export function weatherGridToGeoJSON(grid: WeatherGrid | null): FeatureCollection<Point, Record<string, number | null>> {
   if (!grid) return emptyCollection();
   const variables = Object.keys(grid.values) as WeatherVariable[];

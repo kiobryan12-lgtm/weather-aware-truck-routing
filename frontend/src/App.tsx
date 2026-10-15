@@ -17,7 +17,7 @@ import { RouteComparison } from './components/routes/RouteComparison';
 import { CheckpointTable } from './components/checkpoints/CheckpointTable';
 import { CheckpointDetails } from './components/checkpoints/CheckpointDetails';
 
-/** The route's riskiest checkpoint (the first one if tied). */
+// First checkpoint with the highest risk on the route.
 function riskiestCheckpoint(route: RouteResult | undefined): Checkpoint | null {
   if (!route || route.checkpoints.length === 0) return null;
   return route.checkpoints.reduce((riskiest, checkpoint) =>

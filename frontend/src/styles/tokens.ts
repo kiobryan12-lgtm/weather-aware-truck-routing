@@ -1,6 +1,6 @@
 import type { RiskLevel } from '../types/routing';
 
-/** Literal colors for MapLibre, which can't read CSS variables. Mirrors globals.css. */
+// MapLibre can't read CSS variables, so the map colors are duplicated here. Keep in sync with globals.css.
 
 const ROUTE_COLORS = ['#2563EB', '#16A34A', '#DC2626'] as const;
 

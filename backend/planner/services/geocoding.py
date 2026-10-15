@@ -36,7 +36,7 @@ class Place:
 
 
 def _split_query(query: str) -> tuple[str, str | None]:
-    """'Denver, CO, USA' -> ('Denver', 'CO'). The state may be a code or a full name."""
+    """'Denver, CO, USA' -> ('Denver', 'CO'). Accepts state codes or full names."""
     parts = [part.strip() for part in query.split(",") if part.strip()]
     if parts and parts[-1].lower() in COUNTRY_SUFFIXES:
         parts.pop()
@@ -61,7 +61,7 @@ def _to_place(result: dict) -> Place | None:
 
 
 def search_places(query: str, limit: int = 6) -> list[Place]:
-    """US places matching the query, most populous first."""
+    """US places matching the query, biggest first."""
     city, state = _split_query(query)
     if len(city) < 2:
         return []

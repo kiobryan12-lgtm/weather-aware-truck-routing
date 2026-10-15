@@ -24,7 +24,7 @@ export function cumulativeMiles(line: LngLat[]): number[] {
   return distances;
 }
 
-/** Largest vertex index whose cumulative distance is <= `miles`. */
+// Index of the segment that contains `miles` (binary search).
 function segmentIndexAt(cumulative: number[], miles: number): number {
   let low = 0;
   let high = cumulative.length - 1;

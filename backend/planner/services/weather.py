@@ -23,7 +23,7 @@ Series = tuple[float | None, ...]
 
 @dataclass(frozen=True)
 class HourlyForecast:
-    """Hourly values from `start` (UTC). Rain and snow are totals for the preceding hour, i.e. in/hr."""
+    """Hourly values from `start` (UTC). Rain and snow are totals for the previous hour, so in/hr."""
 
     start: datetime
     wind_mph: Series
@@ -32,7 +32,7 @@ class HourlyForecast:
     cloud_pct: Series
 
     def conditions_at(self, moment: datetime) -> Conditions | None:
-        """Wind interpolated between hours; rain and snow from the hour that contains `moment`."""
+        """Wind is interpolated between hours; rain and snow come from the hour containing `moment`."""
         offset = (moment - self.start) / ONE_HOUR
         last_index = len(self.wind_mph) - 1
         if offset < 0 or offset > last_index:
@@ -55,7 +55,7 @@ def floor_hour(moment: datetime) -> datetime:
 
 
 def fetch_hourly_forecasts(points: Sequence[LngLat], start: datetime, end: datetime) -> list[HourlyForecast | None]:
-    """One forecast per point covering [start, end]; `None` where the window is beyond forecast range."""
+    """One forecast per point for [start, end], or None if it's past the forecast range."""
     first_hour = floor_hour(start)
     last_available_hour = floor_hour(datetime.now(UTC)) + timedelta(days=FORECAST_DAYS) - ONE_HOUR
     last_hour = min(floor_hour(end) + ONE_HOUR, last_available_hour)

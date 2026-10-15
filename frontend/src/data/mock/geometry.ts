@@ -1,7 +1,7 @@
 import type { LngLat } from '../../types/routing';
 import { haversineMiles } from '../../lib/geo';
 
-/** Deterministic PRNG (mulberry32) so the same trip always yields the same geometry. */
+// mulberry32, seeded so the same trip always gets the same geometry
 function seededRandom(seed: string): () => number {
   let hash = 1779033703 ^ seed.length;
   for (let i = 0; i < seed.length; i++) {
@@ -38,7 +38,7 @@ export function densify(waypoints: LngLat[], seed: string, stepMiles = 2): LngLa
 
     for (let step = 1; step <= steps; step++) {
       const progress = step / steps;
-      // Both terms are zero at the endpoints, so every waypoint is hit exactly.
+      // Both terms are 0 at the endpoints so the line passes through each waypoint.
       const offset =
         bendAmplitude * Math.sin(Math.PI * progress) + rippleAmplitude * Math.sin(Math.PI * rippleFrequency * progress);
       line.push([

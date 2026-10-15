@@ -3,7 +3,7 @@ import type { KeyboardEvent } from 'react';
 import type { CheckpointIntervalMiles } from '../../types/routing';
 import { cn } from '../../lib/cn';
 
-const OPTIONS: CheckpointIntervalMiles[] = [10, 25, 50];
+const INTERVAL_OPTIONS: CheckpointIntervalMiles[] = [10, 25, 50];
 
 interface CheckpointIntervalProps {
   labelId: string;
@@ -11,7 +11,6 @@ interface CheckpointIntervalProps {
   onChange: (value: CheckpointIntervalMiles) => void;
 }
 
-/** Radio group with roving tabindex and arrow-key navigation. */
 export function CheckpointInterval({ labelId, value, onChange }: CheckpointIntervalProps) {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -20,14 +19,14 @@ export function CheckpointInterval({ labelId, value, onChange }: CheckpointInter
       event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
     if (!step) return;
     event.preventDefault();
-    const nextIndex = (index + step + OPTIONS.length) % OPTIONS.length;
-    onChange(OPTIONS[nextIndex]);
+    const nextIndex = (index + step + INTERVAL_OPTIONS.length) % INTERVAL_OPTIONS.length;
+    onChange(INTERVAL_OPTIONS[nextIndex]);
     buttonRefs.current[nextIndex]?.focus();
   };
 
   return (
     <div role="radiogroup" aria-labelledby={labelId} className="grid grid-cols-3 gap-2">
-      {OPTIONS.map((option, index) => {
+      {INTERVAL_OPTIONS.map((option, index) => {
         const selected = option === value;
         return (
           <button

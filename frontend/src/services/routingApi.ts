@@ -11,7 +11,7 @@ async function readErrorMessage(response: Response): Promise<string> {
     const message = body.detail ?? body.error;
     if (typeof message === 'string' && message.length < 300) return message;
   } catch {
-    // Non-JSON body: use the generic message below.
+    // not JSON, fall back to the generic message
   }
   return response.status >= 500
     ? 'The routing service is having trouble right now. Please try again in a moment.'

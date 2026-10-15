@@ -3,10 +3,7 @@ import { formatWeight } from '../../lib/format';
 import { RISK_LABELS, RISK_SEVERITY } from '../../lib/risk';
 import type { WeatherSample } from './weatherField';
 
-/**
- * Sample-mode copy of the backend risk rules. A shared boundary belongs to the higher band,
- * except the No Travel edges for rain and snow, which the spec defines as strictly greater.
- */
+// Copy of the backend risk rules for sample mode. See backend/planner/services/risk.py.
 
 type KnownRisk = Exclude<RiskLevel, 'unknown'>;
 type Condition = 'wind' | 'rain' | 'snow';
@@ -70,7 +67,7 @@ interface CheckpointRisk {
   reasons: string[];
 }
 
-/** Load rules apply to wind only; wind >= 55 mph is already No Travel for any load. */
+// Load rules only affect wind. 55+ mph is already No Travel for any load.
 function loadRule(windMph: number, loadLb: number): { risk: KnownRisk; reason: string } | null {
   const load = formatWeight(loadLb);
   if (windMph >= 45 && windMph < 55 && loadLb > 30000) {

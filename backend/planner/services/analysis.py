@@ -30,16 +30,9 @@ CORRIDOR_RADIUS_MILES = 75
 GRID_PADDING_DEG = 1.25
 GEOMETRY_TOLERANCE_DEG = 0.0008
 ANALYSIS_CACHE_SECONDS = 10 * 60
-ROUTE_NAMES_BY_COUNT = {
-    1: ("Direct",),
-    2: ("{first}", "{last}"),
-    3: ("{first}", "Middle", "{last}"),
-}
-
-
 @dataclass(frozen=True)
 class Providers:
-    """External data sources, injectable for tests."""
+    """External services. Tests pass in fakes."""
 
     resolve_place: Callable[[str], geocoding.Place] = geocoding.resolve_place
     fetch_route_options: Callable[..., list[routing.RouteOption]] = routing.fetch_route_options
@@ -54,7 +47,7 @@ class PlannedCheckpoint:
     eta: datetime
 
 
-def iso(moment: datetime) -> str:
+def format_utc(moment: datetime) -> str:
     return moment.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
@@ -63,7 +56,7 @@ def rounded_point(point: LngLat) -> list[float]:
 
 
 def checkpoint_mileposts(total_miles: float, interval_miles: int) -> list[float]:
-    """Every `interval_miles` from the origin, plus the destination."""
+    """Distances of the checkpoints: every interval_miles, plus the destination."""
     mileposts = [float(miles) for miles in range(0, math.ceil(total_miles), interval_miles)]
     if len(mileposts) > 1 and total_miles - mileposts[-1] < 1:
         mileposts[-1] = total_miles
@@ -72,8 +65,13 @@ def checkpoint_mileposts(total_miles: float, interval_miles: int) -> list[float]
     return mileposts
 
 
+def route_names(count: int, east_west: bool) -> list[str]:
+    first, last = ("Northern", "Southern") if east_west else ("Western", "Eastern")
+    return {1: ["Direct"], 2: [first, last], 3: [first, "Middle", last]}[count]
+
+
 def order_and_name(options: Sequence[routing.RouteOption], origin: LngLat, destination: LngLat) -> list[tuple[str, routing.RouteOption]]:
-    """Orders routes north to south (or west to east for north–south trips) and names them by position."""
+    """Sort routes north to south (west to east for north-south trips) and name them."""
     lng_scale = math.cos(math.radians((origin[1] + destination[1]) / 2))
     east_west = abs((destination[0] - origin[0]) * lng_scale) >= abs(destination[1] - origin[1])
 
@@ -84,9 +82,7 @@ def order_and_name(options: Sequence[routing.RouteOption], origin: LngLat, desti
         return sum(lng for lng, _ in coordinates) / len(coordinates)
 
     ordered = sorted(options, key=position)
-    first, last = ("Northern", "Southern") if east_west else ("Western", "Eastern")
-    templates = ROUTE_NAMES_BY_COUNT[len(ordered)]
-    return [(f"{template.format(first=first, last=last)} Route", option) for template, option in zip(templates, ordered)]
+    return [(f"{name} Route", option) for name, option in zip(route_names(len(ordered), east_west), ordered)]
 
 
 def plan_checkpoints(option: routing.RouteOption, trip: TripRequest) -> list[PlannedCheckpoint]:
@@ -122,7 +118,7 @@ def build_route(
                 "id": f"{route_id}-checkpoint-{checkpoint.index}",
                 "index": checkpoint.index,
                 "distance_mi": round(checkpoint.miles, 1),
-                "eta": iso(checkpoint.eta),
+                "eta": format_utc(checkpoint.eta),
                 "location": rounded_point(checkpoint.location),
                 "place_name": None,
                 "weather": {
@@ -137,7 +133,7 @@ def build_route(
             }
         )
 
-    # Each checkpoint covers the road halfway to its neighbours.
+    # A checkpoint covers the road halfway to the previous and next checkpoint.
     mileposts = [checkpoint.miles for checkpoint in planned]
     segments = []
     for index, checkpoint in enumerate(checkpoints):
@@ -174,7 +170,7 @@ def build_route(
 
 
 def grid_points(lines: Sequence[Sequence[LngLat]], spacing_deg: float) -> list[LngLat]:
-    """Grid cells within the trip corridor; latitude spacing shrinks so cells are square on the map."""
+    """Grid points within CORRIDOR_RADIUS_MILES of any route."""
     west, south, east, north = bounds(lines)
     lat_spacing = spacing_deg * math.cos(math.radians((south + north) / 2))
     columns = math.floor((east - west + 2 * GRID_PADDING_DEG) / spacing_deg) + 1
@@ -203,7 +199,7 @@ def build_weather_grid(
         for variable, series in series_by_variable.items()
     }
     return {
-        "start_time": iso(start),
+        "start_time": format_utc(start),
         "hour_count": len(hours),
         "spacing_deg": spacing_deg,
         "points": [list(point) for point in points],
@@ -225,10 +221,7 @@ _search_locks_guard = threading.Lock()
 
 
 def analyze_trip_cached(trip: TripRequest) -> dict:
-    """
-    Identical searches are served from cache, and concurrent identical searches wait for the
-    first one instead of calling the providers again, to stay within free API limits.
-    """
+    """Cache results and make concurrent identical searches wait for the first one (free API limits)."""
     cache_key = analysis_cache_key(trip)
     if (cached := cache.get(cache_key)) is not None:
         return cached
@@ -264,8 +257,8 @@ def analyze_trip(trip: TripRequest, providers: Providers = Providers()) -> dict:
     plans = [plan_checkpoints(option, trip) for _, option in named_options]
     latest_eta = max(checkpoint.eta for plan in plans for checkpoint in plan)
 
-    # Checkpoints share forecasts within a model-scale cell, and every request for this
-    # departure uses the same window, so changing the load or interval reuses cached data.
+    # Same forecast window for every search with this departure, so changing the load
+    # or interval hits the cache.
     checkpoint_cells = [snap_to_cell(checkpoint.location, settings.FORECAST_CELL_DEG) for plan in plans for checkpoint in plan]
     spacing_deg = settings.WEATHER_GRID_SPACING_DEG
     heatmap_points = grid_points([option.coordinates for _, option in named_options], spacing_deg)
@@ -294,7 +287,7 @@ def analyze_trip(trip: TripRequest, providers: Providers = Providers()) -> dict:
     return {
         "origin": {"name": origin.name, "location": list(origin.location)},
         "destination": {"name": destination.name, "location": list(destination.location)},
-        "departure_time": iso(trip.departure),
+        "departure_time": format_utc(trip.departure),
         "load_weight_lb": trip.load_weight_lb,
         "checkpoint_interval_miles": trip.checkpoint_interval_miles,
         "routes": routes,

@@ -39,8 +39,8 @@ class RouteOption:
 
 def fetch_route_options(origin: LngLat, destination: LngLat, count: int = 3) -> list[RouteOption]:
     """
-    Up to `count` distinct routes, fastest first. When OSRM returns fewer alternatives,
-    extra routes are found by forcing a detour through points to either side of the trip.
+    Up to `count` different routes. The public OSRM server often returns only one, so extra
+    routes are found by routing through points to either side of the trip.
     """
     cache_key = f"routes:{origin[0]:.4f},{origin[1]:.4f}:{destination[0]:.4f},{destination[1]:.4f}:{count}"
     if (cached := cache.get(cache_key)) is not None:
@@ -54,7 +54,7 @@ def fetch_route_options(origin: LngLat, destination: LngLat, count: int = 3) -> 
     for across in DETOUR_OFFSETS:
         if len(options) >= count:
             break
-        # Two shifted points keep the whole route to one side instead of a loop out and back.
+        # two points, otherwise OSRM leaves the highway, loops out to the point and comes back
         detour = [offset_point(origin, destination, along=along, across=across) for along in (1 / 3, 2 / 3)]
         for candidate in _request_routes([origin, *detour, destination], alternatives=0):
             if candidate.distance_miles <= longest_allowed and not any(_overlaps(candidate, other) for other in options):
@@ -87,7 +87,7 @@ def _request_routes(waypoints: list[LngLat], alternatives: int) -> list[RouteOpt
 
 
 def parse_route(route: dict) -> RouteOption:
-    """Builds cumulative distance and truck travel time; each segment is capped at the truck speed limit."""
+    """Cumulative miles and truck travel time, with every segment capped at the truck speed."""
     coordinates = [(float(lng), float(lat)) for lng, lat in route["geometry"]["coordinates"]]
     cumulative = cumulative_miles(coordinates)
 
@@ -105,7 +105,7 @@ def parse_route(route: dict) -> RouteOption:
 
 
 def road_summary(legs: list[dict]) -> str:
-    """The three longest roads in driving order, by route number where one exists, e.g. 'I-70 · US-40'."""
+    """Up to three main roads in driving order, joined with " · "."""
     meters_by_road: dict[str, float] = {}
     for leg in legs:
         for step in leg.get("steps", []):

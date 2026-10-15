@@ -1,8 +1,8 @@
 """
 Weather risk rules and route ranking.
 
-A value on a shared boundary belongs to the higher band (rain 0.25 in/hr is High),
-except the No Travel edges for rain and snow, which the spec defines as strictly greater.
+A value exactly on a boundary goes to the higher band (rain 0.25 in/hr is High), except
+the No Travel limits for rain and snow, which the spec gives as strictly greater than.
 """
 
 from collections.abc import Iterable, Sequence
@@ -96,7 +96,7 @@ UNKNOWN_RISK = CheckpointRisk(
 
 
 def load_rule(wind_mph: float, load_lb: int) -> tuple[str, str] | None:
-    """Load rules apply to wind only; wind >= 55 mph is already No Travel for any load."""
+    """Load rules only affect wind. 55+ mph is already No Travel for any load."""
     wind, load = f"{wind_mph:g}", f"{load_lb:,} lb"
     if 45 <= wind_mph < 55 and load_lb > 30_000:
         return NO_TRAVEL, f"Wind speed {wind} mph with a {load} load (over 30,000 lb) is No Travel."
@@ -135,7 +135,7 @@ def evaluate_checkpoint(conditions: Conditions, load_lb: int) -> CheckpointRisk:
 
 
 def summarize_risk(segments: Iterable[tuple[float, str]]) -> dict:
-    """Miles per level and the distance-weighted average risk (Low = 0 … No Travel = 4) from (miles, risk) pairs."""
+    """Miles per risk level and the average risk weighted by distance (0 = Low, 4 = No Travel)."""
     miles_by_level = dict.fromkeys(RISK_LEVELS, 0.0)
     weighted_score = known_miles = 0.0
     for miles, level in segments:
@@ -203,10 +203,10 @@ def _recommendation_reason(best: dict, runner_up: dict) -> str:
 
 def rank_routes(routes: Sequence[dict]) -> dict:
     """
-    Sets `eligible`, `rank`, and `ineligible_reason` on each route and returns the recommendation.
+    Sets eligible, rank and ineligible_reason on each route and returns the recommendation.
 
-    Routes with No Travel miles or no forecast data are ineligible; the rest are ranked by
-    fewest Severe miles, fewest High miles, lowest average risk, then shortest travel time.
+    Routes with No Travel miles or no forecast are skipped. The rest are ranked by Severe miles,
+    High miles, average risk and travel time.
     """
 
     def no_travel_miles(route: dict) -> float:

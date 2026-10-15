@@ -9,7 +9,6 @@ export function Spinner({ label }: { label: string }) {
   );
 }
 
-/** Same footprint as RouteCard to avoid layout shift. */
 export function RouteCardSkeleton() {
   return (
     <div className="flex min-h-40 flex-col rounded-card border border-line bg-surface p-4 shadow-card" aria-hidden>

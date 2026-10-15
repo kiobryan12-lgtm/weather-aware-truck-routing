@@ -6,7 +6,6 @@ import { RISK_LABELS, RISK_TEXT_CLASSES, RISK_TINT_CLASSES } from '../../lib/ris
 import { cn } from '../../lib/cn';
 import { RiskBadge } from '../routes/RiskBadge';
 
-/** Official US National Weather Service point forecast, for independently checking the data. */
 function nwsForecastUrl([lng, lat]: LngLat): string {
   return `https://forecast.weather.gov/MapClick.php?lat=${lat.toFixed(4)}&lon=${lng.toFixed(4)}`;
 }

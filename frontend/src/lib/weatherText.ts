@@ -1,7 +1,5 @@
 import type { Checkpoint } from '../types/routing';
 
-/** Plain-language descriptions, using the same bands as the risk rules. */
-
 const TRACE = 0.005;
 
 export function describeRain(inchesPerHour: number): string {
@@ -43,7 +41,6 @@ export interface PointWeather {
   clouds: number | null;
 }
 
-/** e.g. "Light rain (0.04 in/hr) · Breezy, 18 mph · Partly cloudy". */
 export function describePointWeather({ rain, snow, wind, clouds }: PointWeather): string {
   const parts: string[] = [];
   if (snow !== null && snow >= TRACE) parts.push(`${describeSnow(snow)} (${snow.toFixed(2)} in/hr)`);
@@ -53,7 +50,6 @@ export function describePointWeather({ rain, snow, wind, clouds }: PointWeather)
   return parts.join(' · ') || 'No forecast';
 }
 
-/** Worst conditions along a route, e.g. "Rain up to 0.30 in/hr · wind up to 40 mph". */
 export function describeRouteWeather(checkpoints: Checkpoint[]): string {
   const known = checkpoints.filter((checkpoint) => checkpoint.weather.wind_mph !== null);
   if (known.length === 0) return 'Forecast unavailable';

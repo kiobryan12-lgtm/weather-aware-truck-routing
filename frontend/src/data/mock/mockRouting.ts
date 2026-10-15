@@ -23,7 +23,7 @@ import { createWeatherField } from './weatherField';
 import type { WeatherField } from './weatherField';
 import { evaluateCheckpoint, summarizeRisk } from './riskRules';
 
-/** Simulated POST /api/routes/analyze for UI development. Not a real forecast. */
+// Fake version of POST /api/routes/analyze for working on the UI without the backend.
 
 const HOUR_MS = 3_600_000;
 const FORECAST_HOURS = 48;
@@ -114,7 +114,7 @@ function buildRoute(corridor: CorridorSpec, geometry: LngLat[], context: RouteBu
     return { ...checkpointBase, weather, ...evaluateCheckpoint(weather, context.request.load_weight_lb) };
   });
 
-  // Each checkpoint covers the road halfway to its neighbours.
+  // A checkpoint covers the road halfway to the previous and next checkpoint.
   const segments: RiskSegment[] = checkpoints.map((checkpoint, index) => {
     const fromMiles = index === 0 ? 0 : (mileposts[index - 1] + mileposts[index]) / 2;
     const toMiles = index === checkpoints.length - 1 ? totalMiles : (mileposts[index] + mileposts[index + 1]) / 2;
@@ -146,7 +146,6 @@ function buildRoute(corridor: CorridorSpec, geometry: LngLat[], context: RouteBu
   };
 }
 
-/** Applied in order; a later criterion only breaks ties on the earlier ones. */
 const RANKING_CRITERIA: { tolerance: number; valueOf: (route: RouteDraft) => number }[] = [
   { tolerance: 0.05, valueOf: (route) => route.risk_summary.miles_by_level.severe },
   { tolerance: 0.05, valueOf: (route) => route.risk_summary.miles_by_level.high },
@@ -185,7 +184,6 @@ function recommendationReason(best: RouteDraft, runnerUp: RouteDraft): string {
   }
 }
 
-/** Routes with No Travel miles are excluded; the rest are ranked by RANKING_CRITERIA. */
 function rankRoutes(drafts: RouteDraft[]): { routes: RouteResult[]; recommendation: Recommendation } {
   const isEligible = (route: RouteDraft) =>
     route.risk_summary.miles_by_level.no_travel === 0 && route.risk_summary.average_risk !== null;
@@ -233,7 +231,7 @@ function rankRoutes(drafts: RouteDraft[]): { routes: RouteResult[]; recommendati
 
 function buildWeatherGrid(weatherAt: WeatherField, bounds: Bounds, forecastStart: Date): WeatherGrid {
   const [[west, south], [east, north]] = bounds;
-  // Shrink latitude spacing so cells are square on a Mercator map.
+  // Smaller latitude step so cells look square on the map.
   const latSpacing = GRID_SPACING_DEG * Math.cos((((south + north) / 2) * Math.PI) / 180);
 
   const points: LngLat[] = [];

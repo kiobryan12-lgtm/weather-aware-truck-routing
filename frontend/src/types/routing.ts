@@ -1,4 +1,4 @@
-/** API contract with the Django backend, which owns risk classification and ranking. */
+// Shapes of the Django API requests and responses.
 
 export type LngLat = [lng: number, lat: number];
 
@@ -8,11 +8,11 @@ export type CheckpointIntervalMiles = 10 | 25 | 50;
 
 export type WeatherVariable = 'precipitation' | 'wind' | 'snow' | 'clouds';
 
-/** POST /api/routes/analyze request body. */
+// POST /api/routes/analyze
 export interface TripRequest {
   origin: string;
   destination: string;
-  /** ISO 8601 timestamp (UTC). */
+  // ISO 8601, UTC
   departure_time: string;
   load_weight_lb: number;
   checkpoint_interval_miles: CheckpointIntervalMiles;
@@ -23,7 +23,7 @@ export interface Place {
   location: LngLat;
 }
 
-/** Forecast at the checkpoint's ETA; `null` when unavailable. */
+// null when there's no forecast for the ETA
 export interface CheckpointWeather {
   wind_mph: number | null;
   rain_in_hr: number | null;
@@ -38,7 +38,7 @@ export interface Checkpoint {
   location: LngLat;
   place_name: string | null;
   weather: CheckpointWeather;
-  /** Per-condition risk before load rules. */
+  // before load rules
   condition_risk: Record<'wind' | 'rain' | 'snow', RiskLevel>;
   load_adjusted: boolean;
   risk: RiskLevel;
@@ -55,7 +55,7 @@ export interface RiskSegment {
 
 export interface RiskSummary {
   miles_by_level: Record<RiskLevel, number>;
-  /** Distance-weighted, Low = 0 … No Travel = 4. */
+  // weighted by distance, 0 = Low to 4 = No Travel
   average_risk: number | null;
 }
 
@@ -81,7 +81,7 @@ export interface Recommendation {
   reason: string;
 }
 
-/** Hourly heatmap frames: `values[variable][hour][pointIndex]` (in/hr, mph, in/hr, %). */
+// values[variable][hour][pointIndex]
 export interface WeatherGrid {
   start_time: string;
   hour_count: number;
@@ -90,7 +90,7 @@ export interface WeatherGrid {
   values: Record<WeatherVariable, (number | null)[][]>;
 }
 
-/** POST /api/routes/analyze response body. */
+// Response of POST /api/routes/analyze
 export interface AnalyzeResponse {
   origin: Place;
   destination: Place;

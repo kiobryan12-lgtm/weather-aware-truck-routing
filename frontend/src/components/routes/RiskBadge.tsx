@@ -2,7 +2,7 @@ import type { RiskLevel } from '../../types/routing';
 import { RISK_LABELS, RISK_TINT_CLASSES } from '../../lib/risk';
 import { cn } from '../../lib/cn';
 
-/** Moderate keeps dark text for contrast on yellow. */
+// Dark text on yellow for contrast.
 const SOLID_CLASSES: Record<RiskLevel, string> = {
   low: 'bg-risk-low text-white',
   moderate: 'bg-risk-moderate text-ink',
@@ -15,7 +15,6 @@ const SOLID_CLASSES: Record<RiskLevel, string> = {
 interface RiskBadgeProps {
   level: RiskLevel;
   variant?: 'tint' | 'solid';
-  /** Renders e.g. "High Risk". */
   withSuffix?: boolean;
   srPrefix?: string;
   className?: string;

@@ -1,9 +1,7 @@
 import type { Bounds } from '../../lib/geo';
 
-/**
- * Simulated weather for sample mode (not a forecast): moving storm cells over a baseline,
- * authored for Denver → Kansas City and rescaled onto other corridors.
- */
+// Fake weather for sample mode: a few moving storm cells placed for Denver to Kansas City
+// and stretched to fit other trips. Not a forecast.
 
 export interface WeatherSample {
   wind_mph: number;
@@ -22,7 +20,7 @@ interface StormCell {
   rain: number;
   snow: number;
   wind: number;
-  /** Active window in hours since departure. */
+  // hours after departure
   startHour: number;
   endHour: number;
 }
@@ -41,7 +39,7 @@ const STORM_CELLS: StormCell[] = [
   { lng: -101.4, lat: 37.85, lngPerHour: 0.12, latPerHour: 0, lngRadius: 1.5, latRadius: 0.6, rain: 0.06, snow: 0, wind: 37, startHour: 0, endHour: 14 },
   // Showers, central Kansas
   { lng: -99.7, lat: 38.9, lngPerHour: 0.3, latPerHour: 0, lngRadius: 1.2, latRadius: 1.05, rain: 0.33, snow: 0, wind: 10, startHour: -2, endHour: 16 },
-  // Later systems for the 0–48 h slider
+  // Later systems so the slider has something to show
   { lng: -106.5, lat: 39.6, lngPerHour: 0.42, latPerHour: -0.02, lngRadius: 1.8, latRadius: 1.4, rain: 0.6, snow: 0, wind: 18, startHour: 16, endHour: 46 },
   { lng: -103.0, lat: 41.6, lngPerHour: 0.3, latPerHour: -0.05, lngRadius: 1.4, latRadius: 0.9, rain: 0, snow: 1.8, wind: 20, startHour: 26, endHour: 52 },
 ];
@@ -53,7 +51,6 @@ function smoothstep(edge0: number, edge1: number, value: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** 0 → 1 → 0 strength over a cell's active window. */
 function cellStrength(hour: number, startHour: number, endHour: number): number {
   return Math.max(0, Math.min(1, (hour - startHour) / RAMP_HOURS, (endHour - hour) / RAMP_HOURS));
 }
@@ -81,7 +78,7 @@ export function createWeatherField(bounds: Bounds): WeatherField {
       Math.sin(1.1 * lng + 0.35 * hour) * Math.cos(1.6 * lat - 0.2 * hour) +
       0.6 * Math.sin(2.3 * lng - 1.7 * lat + 0.5 * hour);
 
-    // Light showers stay below 0.10 in/hr so they never change a risk level.
+    // Background showers stay under 0.10 in/hr so they never change the risk.
     let rain = 0.09 * smoothstep(0.35, 1.4, showerPattern);
     let snow = 0;
     let wind = 13 + 3 * Math.sin(0.9 * lng + 0.25 * hour) + 2 * Math.cos(1.4 * lat - 0.15 * hour);

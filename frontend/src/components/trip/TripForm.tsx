@@ -20,7 +20,7 @@ type FieldName = Exclude<keyof FormValues, 'interval'>;
 type FormErrors = Partial<Record<FieldName, string>>;
 
 const MAX_LOAD_LB = 200_000;
-/** Keeps "now" valid while the form stays open. */
+// Allow a little slack so a departure of "now" doesn't go stale while the form is open.
 const PAST_GRACE_MS = 60 * 60 * 1000;
 
 function defaultDeparture(): string {
@@ -88,7 +88,7 @@ export function TripForm({ loading, onSubmit, submitOnMount = false }: TripFormP
   const isValid = Object.keys(errors).length === 0;
   const timeZone = useMemo(localTimeZoneLabel, []);
 
-  // React StrictMode runs effects twice in development; the flag keeps this to one request.
+  // StrictMode runs effects twice in dev; only submit once.
   const mountSubmitRef = useRef({ submitOnMount, values, onSubmit, submitted: false });
   useEffect(() => {
     const mount = mountSubmitRef.current;
@@ -166,7 +166,6 @@ export function TripForm({ loading, onSubmit, submitOnMount = false }: TripFormP
               value={values.loadWeight}
               invalid={Boolean(visibleError('loadWeight'))}
               aria-describedby={fieldDescribedBy('trip-load', visibleError('loadWeight'))}
-              // Digits only, so negative values can't be entered.
               onChange={(event) => setField('loadWeight', event.target.value.replace(/\D/g, '').slice(0, 6))}
               onBlur={() => markTouched('loadWeight')}
               className="tabular-nums"

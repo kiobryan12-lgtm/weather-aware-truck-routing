@@ -57,7 +57,6 @@ export function formatCoordinates([lng, lat]: LngLat): string {
   return `${Math.abs(lat).toFixed(2)}°${latHemisphere}, ${Math.abs(lng).toFixed(2)}°${lngHemisphere}`;
 }
 
-/** e.g. "America/Denver (MDT)". */
 export function localTimeZoneLabel(): string {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const abbreviation = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })

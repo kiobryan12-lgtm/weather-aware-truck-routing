@@ -2,7 +2,7 @@ import type { ExpressionSpecification } from 'maplibre-gl';
 import type { WeatherVariable } from '../../types/routing';
 import { RISK_COLORS } from '../../styles/tokens';
 
-/** "combined" shows the strongest of rain, snow, and (Moderate or stronger) wind. */
+// combined = worst of rain, snow and wind at each point
 export type WeatherLayer = 'combined' | WeatherVariable;
 
 type ThresholdStops = [number, number, number, number, number];
@@ -16,21 +16,19 @@ export interface LegendBand {
 interface WeatherLayerConfig {
   title: string;
   description: string;
-  /** Hour `h` is stored as the property `${prefix}${h}`. */
+  // GeoJSON property for hour h is `${prefix}${h}`
   prefix: string;
-  /** Values at weights 0, 0.25, 0.5, 0.75, and 1 (the risk thresholds). */
+  // values mapped to weights 0, 0.25, 0.5, 0.75 and 1
   stops: ThresholdStops;
-  /** [weight, color] pairs; the first stop is transparent. */
+  // [weight, color]; first stop is transparent
   ramp: [number, string][];
   bands: LegendBand[];
 }
 
 const LIGHT_COLOR = '#93C5FD';
 
-/**
- * Weights 0.25 / 0.5 / 0.75 / 1 are the Moderate / High / Severe / No Travel thresholds,
- * so map colours mean the same as the risk badges.
- */
+// Weights 0.25, 0.5, 0.75 and 1 are the Moderate, High, Severe and No Travel thresholds,
+// so the map uses the same colours as the risk badges.
 const RISK_RAMP: [number, string][] = [
   [0.02, 'rgba(147,197,253,0)'],
   [0.07, LIGHT_COLOR],
@@ -116,7 +114,7 @@ export const WEATHER_LAYER_OPTIONS: { value: WeatherLayer; label: string }[] = [
 
 const STOP_WEIGHTS = [0, 0.25, 0.5, 0.75, 1];
 
-/** JS equivalent of the weight part of `heatColorExpression`. */
+// Same mapping as the weight expression in heatColorExpression.
 export function valueToWeight(stops: ThresholdStops, value: number | null): number {
   if (value === null || value <= stops[0]) return 0;
   for (let i = 1; i < stops.length; i++) {
@@ -128,12 +126,10 @@ export function valueToWeight(stops: ThresholdStops, value: number | null): numb
   return 1;
 }
 
-/** Weight at which a layer's colour starts to show. */
 export function visibleFromWeight(config: WeatherLayerConfig): number {
   return (config.ramp[0][0] + config.ramp[1][0]) / 2;
 }
 
-/** Colour for each grid cell at `hour`, from its value mapped onto the layer's ramp. */
 export function heatColorExpression(config: WeatherLayerConfig, hour: number): ExpressionSpecification {
   const [minimum, low, middle, high, maximum] = config.stops;
   const weight: ExpressionSpecification = [

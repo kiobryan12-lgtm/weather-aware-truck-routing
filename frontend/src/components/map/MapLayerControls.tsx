@@ -8,7 +8,7 @@ import type { WeatherLayer } from './weatherLayers';
 interface MapLayerControlsProps {
   value: WeatherLayer;
   onChange: (value: WeatherLayer) => void;
-  /** Legend shown inside the panel on small screens. */
+  // Shown in the panel on small screens instead of the floating legend.
   mobileLegend?: ReactNode;
 }
 

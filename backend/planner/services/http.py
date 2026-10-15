@@ -16,7 +16,7 @@ _client = httpx.Client(
 
 
 class UpstreamError(Exception):
-    """A third-party service failed. `message` is safe to show to users."""
+    """An external service failed. `message` can be shown to the user."""
 
     def __init__(self, message: str, status: int | None = None, payload: Any = None):
         super().__init__(message)
@@ -47,7 +47,7 @@ def get_json(url: str, *, params: dict[str, Any] | None = None, service: str) ->
                 continue
             raise UpstreamError(f"The {service} service is unreachable. Please try again.") from error
         except httpx.TimeoutException as error:
-            # Retrying a slow request would spend more of the provider's rate limit.
+            # don't retry, it would just use up more of the rate limit
             logger.warning("%s timed out: %s", service, error)
             raise UpstreamError(f"The {service} service is responding slowly. Please try again in a minute.") from error
         except httpx.HTTPError as error:
@@ -55,7 +55,7 @@ def get_json(url: str, *, params: dict[str, Any] | None = None, service: str) ->
             raise UpstreamError(f"The {service} service is unreachable. Please try again.") from error
 
         if response.status_code == TOO_MANY_REQUESTS:
-            # Free-tier limits reset per minute, hour, or day; retrying immediately would fail again.
+            # limits are per minute/hour/day, retrying now would fail again
             reason = _error_reason(response) or "Please try again later."
             logger.warning("%s rate limit reached: %s", service, reason)
             raise UpstreamError(f"The {service} service's free usage limit was reached. {reason}", TOO_MANY_REQUESTS)
