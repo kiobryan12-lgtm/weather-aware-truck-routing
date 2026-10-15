@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { CalendarDays, MapPin, Pencil, Search, Truck } from 'lucide-react';
 import type { CheckpointIntervalMiles, TripRequest } from '../../types/routing';
@@ -72,7 +72,6 @@ function FieldRow({ icon, children }: { icon: ReactNode; children: ReactNode }) 
 interface TripFormProps {
   loading: boolean;
   onSubmit: (request: TripRequest) => void;
-  submitOnMount?: boolean;
   // Shows a one-line summary instead of the fields, to leave room for the results.
   collapsed?: boolean;
   onExpand?: () => void;
@@ -85,27 +84,18 @@ function tripSummary(values: FormValues): string {
   return [when, load, `every ${values.interval} mi`].filter(Boolean).join(' · ');
 }
 
-export function TripForm({ loading, onSubmit, submitOnMount = false, collapsed = false, onExpand }: TripFormProps) {
+export function TripForm({ loading, onSubmit, collapsed = false, onExpand }: TripFormProps) {
   const [values, setValues] = useState<FormValues>(() => ({
-    origin: 'Denver, CO, USA',
-    destination: 'Kansas City, MO, USA',
+    origin: '',
+    destination: '',
     departure: defaultDeparture(),
-    loadWeight: '35000',
+    loadWeight: '',
     interval: 25,
   }));
   const [touched, setTouched] = useState<Partial<Record<FieldName, boolean>>>({});
   const errors = useMemo(() => validate(values), [values]);
   const isValid = Object.keys(errors).length === 0;
   const timeZone = useMemo(localTimeZoneLabel, []);
-
-  // StrictMode runs effects twice in dev; only submit once.
-  const mountSubmitRef = useRef({ submitOnMount, values, onSubmit, submitted: false });
-  useEffect(() => {
-    const mount = mountSubmitRef.current;
-    if (mount.submitted || !mount.submitOnMount || Object.keys(validate(mount.values)).length > 0) return;
-    mount.submitted = true;
-    mount.onSubmit(toRequest(mount.values));
-  }, []);
 
   const setField = <K extends keyof FormValues>(key: K, value: FormValues[K]) => setValues((current) => ({ ...current, [key]: value }));
   const markTouched = (key: FieldName) => setTouched((current) => ({ ...current, [key]: true }));
@@ -215,7 +205,6 @@ export function TripForm({ loading, onSubmit, submitOnMount = false, collapsed =
         <Button
           type="submit"
           loading={loading}
-          disabled={!isValid}
           icon={<Search />}
           className="w-full md:self-end lg:mt-1 lg:self-auto"
         >

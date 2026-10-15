@@ -4,7 +4,7 @@ import { RISK_SEVERITY } from './lib/risk';
 import { formatMiles } from './lib/format';
 import { truckPositionAt } from './lib/truckPosition';
 import { useRouteAnalysis } from './hooks/useRouteAnalysis';
-import { isSampleMode } from './services/routingApi';
+import { isSampleMode, wakeBackend } from './services/routingApi';
 import { AppHeader } from './components/layout/AppHeader';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { TripForm } from './components/trip/TripForm';
@@ -49,6 +49,9 @@ export default function App() {
     setPlaying(false);
     if (data) setFormCollapsed(true);
   }
+
+  // Start the free backend while the user fills in the trip.
+  useEffect(wakeBackend, []);
 
   useEffect(() => {
     if (!playing) return;
@@ -122,7 +125,6 @@ export default function App() {
         <TripForm
           loading={status === 'loading'}
           onSubmit={analyze}
-          submitOnMount
           collapsed={formCollapsed}
           onExpand={() => setFormCollapsed(false)}
         />

@@ -67,6 +67,11 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
   }
 }
 
+export function wakeBackend(): void {
+  if (isSampleMode) return;
+  fetch(`${API_BASE_URL}/api/health`).catch(() => undefined);
+}
+
 export async function analyzeRoutes(trip: TripRequest, signal?: AbortSignal): Promise<AnalyzeResponse> {
   if (isSampleMode) {
     const { mockAnalyzeRoutes } = await import('../data/mock/mockRouting');
