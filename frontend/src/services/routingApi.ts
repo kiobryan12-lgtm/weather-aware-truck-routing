@@ -3,7 +3,7 @@ import { ApiError } from './apiError';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
-export const isSampleMode = import.meta.env.VITE_DATA_SOURCE !== 'api';
+export const isSampleMode = import.meta.env.VITE_DATA_SOURCE === 'mock';
 
 async function readErrorMessage(response: Response): Promise<string> {
   try {
