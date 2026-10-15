@@ -21,12 +21,14 @@ Backend (no database or API keys needed):
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
+source .venv/Scripts/activate   # Git Bash. PowerShell: .venv\Scripts\Activate.ps1  macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py runserver      # http://127.0.0.1:8000
 ```
 
-Frontend, in a second terminal:
+Keep the backend running and start the frontend in a second terminal.
+
+Frontend:
 
 ```bash
 cd frontend
