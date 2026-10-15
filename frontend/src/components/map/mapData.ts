@@ -77,6 +77,21 @@ function layerWeight(grid: WeatherGrid, layer: WeatherLayer, hour: number, point
   return valueToWeight(WEATHER_LAYERS[layer].stops, valueAt(grid, layer, hour, pointIndex));
 }
 
+/** Nearest grid cell to a map position, or null outside the forecast area. */
+export function nearestGridPointIndex(grid: WeatherGrid, [lng, lat]: [number, number]): number | null {
+  const lngScale = Math.cos((lat * Math.PI) / 180);
+  let nearestIndex: number | null = null;
+  let nearestDistance = Infinity;
+  grid.points.forEach(([pointLng, pointLat], index) => {
+    const distance = Math.hypot((pointLng - lng) * lngScale, pointLat - lat);
+    if (distance < nearestDistance) {
+      nearestIndex = index;
+      nearestDistance = distance;
+    }
+  });
+  return nearestDistance <= grid.spacing_deg * lngScale * 0.75 ? nearestIndex : null;
+}
+
 /** Strongest weight anywhere on the grid for each forecast hour. */
 export function peakWeightByHour(grid: WeatherGrid, layer: WeatherLayer): number[] {
   return Array.from({ length: grid.hour_count }, (_, hour) =>

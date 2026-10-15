@@ -1,4 +1,4 @@
-import { legendGradient, WEATHER_LAYERS } from './weatherLayers';
+import { WEATHER_LAYERS } from './weatherLayers';
 import type { WeatherLayer } from './weatherLayers';
 
 interface MapLegendProps {
@@ -15,11 +15,17 @@ export function MapLegend({ layer, hasWeatherNow, strongestHour, onShowHour }: M
   return (
     <div>
       <p className="text-label font-semibold text-ink">{config.title}</p>
-      <div className="mt-1.5 h-2.5 rounded-full" style={{ background: legendGradient(config) }} aria-hidden />
-      <div className="mt-1 flex justify-between text-label text-ink-muted">
-        <span>{config.lowLabel}</span>
-        <span>{config.highLabel}</span>
-      </div>
+      <p className="text-meta text-ink-muted">{config.description}</p>
+      <ul className="mt-2 grid grid-cols-[repeat(auto-fit,minmax(56px,1fr))] gap-x-1.5 gap-y-2">
+        {config.bands.map((band) => (
+          <li key={band.label} className="min-w-0">
+            <span className="block h-2 rounded-full" style={{ backgroundColor: band.color }} aria-hidden />
+            <span className="mt-1 block text-meta font-semibold text-ink">{band.label}</span>
+            {band.range && <span className="block text-meta whitespace-nowrap text-ink-muted tabular-nums">{band.range}</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1.5 text-meta text-ink-muted">Point at the map to read the weather.</p>
       {!hasWeatherNow && (
         <p className="mt-1.5 border-t border-line pt-1.5 text-label text-ink-secondary" role="status">
           {strongestHour === null ? (

@@ -18,7 +18,7 @@ export function MapLayerControls({ value, onChange, mobileLegend }: MapLayerCont
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="absolute top-3 right-3 z-10 flex flex-col items-end md:top-4 md:right-4">
+    <div className="absolute top-3 right-3 z-20 flex flex-col items-end md:top-4 md:right-4">
       <button
         type="button"
         aria-expanded={open}
@@ -34,7 +34,7 @@ export function MapLayerControls({ value, onChange, mobileLegend }: MapLayerCont
       <div
         id={panelId}
         className={cn(
-          'mt-2 w-[185px] rounded-panel border border-line bg-surface p-2 shadow-float md:mt-0 md:block',
+          'mt-2 max-h-[324px] w-[185px] overflow-y-auto rounded-panel border border-line bg-surface p-2 shadow-float md:mt-0 md:block md:max-h-none md:overflow-visible',
           !open && 'hidden',
         )}
       >

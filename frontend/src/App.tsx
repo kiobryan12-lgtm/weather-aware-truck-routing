@@ -98,7 +98,7 @@ export default function App() {
           {weatherGrid && (
             <div className="pointer-events-none absolute right-12 bottom-3 left-3 z-10 flex items-end gap-3 md:bottom-4 md:left-4">
               {legendContent && (
-                <div className="pointer-events-auto hidden w-[230px] shrink-0 rounded-panel border border-line bg-surface px-3 py-2.5 shadow-float md:block">
+                <div className="pointer-events-auto hidden w-[290px] shrink-0 rounded-panel border border-line bg-surface px-3 py-2.5 shadow-float md:block">
                   {legendContent}
                 </div>
               )}

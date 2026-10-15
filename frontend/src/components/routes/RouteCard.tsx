@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { AlertOctagon, ArrowRight, Clock, Route as RouteIcon, ShieldAlert, ShieldCheck, TriangleAlert, Truck } from 'lucide-react';
+import { AlertOctagon, ArrowRight, Clock, CloudSun, Route as RouteIcon, ShieldAlert, ShieldCheck, TriangleAlert, Truck } from 'lucide-react';
 import type { RouteResult } from '../../types/routing';
 import { formatDuration, formatMiles } from '../../lib/format';
+import { describeRouteWeather } from '../../lib/weatherText';
 import { RISK_COLORS } from '../../styles/tokens';
 import { RiskBadge } from './RiskBadge';
 
@@ -126,6 +127,14 @@ export function RouteCard({ route, color, selected, recommended, onSelect, onVie
         </dl>
         <RiskGauge score={route.risk_summary.average_risk} color={color} />
       </div>
+
+      <p className="mt-3 flex items-center gap-1.5 text-label text-ink-secondary">
+        <CloudSun className="size-4 shrink-0 text-ink-muted" aria-hidden />
+        <span className="truncate">
+          <span className="sr-only">Weather on this route: </span>
+          {describeRouteWeather(route.checkpoints)}
+        </span>
+      </p>
 
       {milesByLevel.no_travel > 0 && (
         <p className="mt-3 flex items-center gap-1.5 rounded-control bg-risk-severe-bg px-2.5 py-1.5 text-label font-semibold text-risk-severe-fg">

@@ -4,12 +4,13 @@ import maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, PointLike, StyleSpecification } from 'maplibre-gl';
 import type { AnalyzeResponse } from '../../types/routing';
 import { boundsOf } from '../../lib/geo';
-import { formatTime } from '../../lib/format';
+import { formatTime, formatWeekdayTime } from '../../lib/format';
+import { describePointWeather } from '../../lib/weatherText';
 import { RISK_LABELS } from '../../lib/risk';
 import { MAP_COLORS } from '../../styles/tokens';
 import { Spinner } from '../common/LoadingState';
 import { addRouteLayers, applyHeatGridSpacing, applyRouteSelection, LAYERS, SOURCES } from './mapLayers';
-import { checkpointsToGeoJSON, routesToGeoJSON, weatherGridToGeoJSON } from './mapData';
+import { checkpointsToGeoJSON, nearestGridPointIndex, routesToGeoJSON, weatherGridToGeoJSON } from './mapData';
 import type { CheckpointFeatureProps, RouteFeatureProps } from './mapData';
 import { heatColorExpression, WEATHER_LAYERS } from './weatherLayers';
 import type { WeatherLayer } from './weatherLayers';
@@ -80,9 +81,12 @@ export function RouteMap({
   const selectedCheckpointRef = useRef<string | null>(null);
   const heatmapFrameRef = useRef(0);
 
+  const forecastHourRef = useRef(forecastHour);
+
   useEffect(() => {
     handlersRef.current = { onSelectRoute, onSelectCheckpoint };
     dataRef.current = data;
+    forecastHourRef.current = forecastHour;
   });
 
   useEffect(() => {
@@ -183,6 +187,28 @@ export function RouteMap({
       return `Route ${route?.label ?? ''} · Checkpoint ${hit.props.index + 1} · ${risk} · ETA ${formatTime(hit.props.eta)}`;
     };
 
+    const weatherTextAt = ({ lng, lat }: { lng: number; lat: number }): string | null => {
+      const grid = dataRef.current?.weather_grid;
+      const pointIndex = grid ? nearestGridPointIndex(grid, [lng, lat]) : null;
+      if (!grid || pointIndex === null) return null;
+      const hour = forecastHourRef.current;
+      const valueOf = (variable: keyof typeof grid.values) => grid.values[variable][hour]?.[pointIndex] ?? null;
+      const time = new Date(new Date(grid.start_time).getTime() + hour * 3_600_000);
+      const weather = describePointWeather({
+        rain: valueOf('precipitation'),
+        snow: valueOf('snow'),
+        wind: valueOf('wind'),
+        clouds: valueOf('clouds'),
+      });
+      return `${formatWeekdayTime(time)} · ${weather}`;
+    };
+
+    const showTooltip = (text: string, lngLat: maplibregl.LngLat) => {
+      tooltipText.textContent = text;
+      tooltip.setLngLat(lngLat);
+      if (!tooltip.isOpen()) tooltip.addTo(map);
+    };
+
     const clearHover = () => {
       setHover(SOURCES.routes, hoveredRoute, null);
       setHover(SOURCES.checkpoints, hoveredCheckpoint, null);
@@ -196,26 +222,30 @@ export function RouteMap({
       const hit = featureAt(event.point);
       const nextRoute = hit?.kind === 'route' ? hit.props.route_id : null;
       const nextCheckpoint = hit?.kind === 'checkpoint' ? hit.props.id : null;
-      const changed = nextRoute !== hoveredRoute || nextCheckpoint !== hoveredCheckpoint;
       setHover(SOURCES.routes, hoveredRoute, nextRoute);
       setHover(SOURCES.checkpoints, hoveredCheckpoint, nextCheckpoint);
       hoveredRoute = nextRoute;
       hoveredCheckpoint = nextCheckpoint;
       map.getCanvas().style.cursor = hit ? 'pointer' : '';
 
-      if (!hit) {
-        tooltip.remove();
+      if (hit) {
+        showTooltip(tooltipTextFor(hit), event.lngLat);
         return;
       }
-      if (changed) tooltipText.textContent = tooltipTextFor(hit);
-      tooltip.setLngLat(event.lngLat);
-      if (!tooltip.isOpen()) tooltip.addTo(map);
+      const weatherText = weatherTextAt(event.lngLat);
+      if (weatherText) showTooltip(weatherText, event.lngLat);
+      else tooltip.remove();
     };
 
     const onClick = (event: MapMouseEvent) => {
       const hit = featureAt(event.point);
       if (hit?.kind === 'checkpoint') handlersRef.current.onSelectCheckpoint(hit.props.route_id, hit.props.id);
       else if (hit?.kind === 'route') handlersRef.current.onSelectRoute(hit.props.route_id);
+      else {
+        // Touch screens have no hover, so a tap reads the weather instead.
+        const weatherText = weatherTextAt(event.lngLat);
+        if (weatherText) showTooltip(weatherText, event.lngLat);
+      }
     };
 
     const canvas = map.getCanvas();

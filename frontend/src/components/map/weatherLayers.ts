@@ -1,93 +1,108 @@
 import type { ExpressionSpecification } from 'maplibre-gl';
 import type { WeatherVariable } from '../../types/routing';
+import { RISK_COLORS } from '../../styles/tokens';
 
 /** "combined" shows the strongest of rain, snow, and (Moderate or stronger) wind. */
 export type WeatherLayer = 'combined' | WeatherVariable;
 
 type ThresholdStops = [number, number, number, number, number];
 
+export interface LegendBand {
+  label: string;
+  range: string;
+  color: string;
+}
+
 interface WeatherLayerConfig {
   title: string;
+  description: string;
   /** Hour `h` is stored as the property `${prefix}${h}`. */
   prefix: string;
-  /** Values at weights 0, 0.25, 0.5, 0.75, and 1 (risk thresholds where they exist). */
+  /** Values at weights 0, 0.25, 0.5, 0.75, and 1 (the risk thresholds). */
   stops: ThresholdStops;
   /** [weight, color] pairs; the first stop is transparent. */
   ramp: [number, string][];
-  lowLabel: string;
-  highLabel: string;
+  bands: LegendBand[];
 }
 
-const RADAR_RAMP: [number, string][] = [
+const LIGHT_COLOR = '#93C5FD';
+
+/**
+ * Weights 0.25 / 0.5 / 0.75 / 1 are the Moderate / High / Severe / No Travel thresholds,
+ * so map colours mean the same as the risk badges.
+ */
+const RISK_RAMP: [number, string][] = [
   [0.02, 'rgba(147,197,253,0)'],
-  [0.07, '#93C5FD'],
-  [0.25, '#3B82F6'],
-  [0.45, '#22C55E'],
-  [0.65, '#FACC15'],
-  [0.82, '#F97316'],
-  [1, '#DC2626'],
+  [0.07, LIGHT_COLOR],
+  [0.24, LIGHT_COLOR],
+  [0.25, RISK_COLORS.moderate],
+  [0.49, RISK_COLORS.moderate],
+  [0.5, RISK_COLORS.high],
+  [0.74, RISK_COLORS.high],
+  [0.75, RISK_COLORS.severe],
+  [0.99, RISK_COLORS.severe],
+  [1, RISK_COLORS.no_travel],
 ];
+
+function riskBands(ranges: [string, string, string, string]): LegendBand[] {
+  return [
+    { label: 'Light', range: ranges[0], color: LIGHT_COLOR },
+    { label: 'Moderate', range: ranges[1], color: RISK_COLORS.moderate },
+    { label: 'High', range: ranges[2], color: RISK_COLORS.high },
+    { label: 'Severe', range: ranges[3], color: RISK_COLORS.severe },
+  ];
+}
 
 export const WEATHER_LAYERS: Record<WeatherLayer, WeatherLayerConfig> = {
   combined: {
-    title: 'Weather (Combined Intensity)',
+    title: 'Weather risk',
+    description: 'Strongest of rain, snow, and wind. Colours match the route risk levels.',
     prefix: 'x',
     stops: [0, 0.25, 0.5, 0.75, 1],
-    ramp: RADAR_RAMP,
-    lowLabel: 'Light',
-    highLabel: 'Severe',
+    ramp: RISK_RAMP,
+    bands: riskBands(['', '', '', '']),
   },
   precipitation: {
-    title: 'Weather (Precipitation Intensity)',
+    title: 'Rain (in/hr)',
+    description: 'Rainfall rate at the selected time.',
     prefix: 'p',
     stops: [0, 0.1, 0.25, 0.5, 1],
-    ramp: RADAR_RAMP,
-    lowLabel: 'Light',
-    highLabel: 'Heavy',
+    ramp: RISK_RAMP,
+    bands: riskBands(['< 0.10', '0.10–0.25', '0.25–0.50', '0.50+']),
   },
   wind: {
-    title: 'Wind Speed (mph)',
+    title: 'Wind (mph)',
+    description: 'Sustained wind speed at the selected time.',
     prefix: 'w',
     stops: [10, 25, 35, 45, 55],
-    ramp: [
-      [0.04, 'rgba(251,207,232,0)'],
-      [0.15, '#FBCFE8'],
-      [0.35, '#F472B6'],
-      [0.6, '#DB2777'],
-      [0.8, '#9D174D'],
-      [1, '#581C87'],
-    ],
-    lowLabel: 'Calm',
-    highLabel: 'Strong',
+    ramp: RISK_RAMP,
+    bands: riskBands(['15–24', '25–34', '35–44', '45+']),
   },
   snow: {
-    title: 'Snowfall (in/hr)',
+    title: 'Snow (in/hr)',
+    description: 'Snowfall rate at the selected time.',
     prefix: 's',
     stops: [0, 0.5, 1, 2, 3],
-    ramp: [
-      [0.01, 'rgba(199,210,254,0)'],
-      [0.05, '#E0E7FF'],
-      [0.3, '#A5B4FC'],
-      [0.55, '#6366F1'],
-      [0.8, '#4338CA'],
-      [1, '#312E81'],
-    ],
-    lowLabel: 'Light',
-    highLabel: 'Heavy',
+    ramp: RISK_RAMP,
+    bands: riskBands(['< 0.5', '0.5–1.0', '1.0–2.0', '2.0+']),
   },
   clouds: {
-    title: 'Cloud Cover (%)',
+    title: 'Cloud cover',
+    description: 'Share of the sky covered by cloud. Not part of the risk rules.',
     prefix: 'k',
     stops: [0, 25, 50, 75, 100],
     ramp: [
-      [0.15, 'rgba(203,213,225,0)'],
-      [0.35, 'rgba(148,163,184,0.35)'],
-      [0.6, 'rgba(100,116,139,0.55)'],
-      [0.85, 'rgba(71,85,105,0.7)'],
+      [0.24, 'rgba(203,213,225,0)'],
+      [0.3, 'rgba(148,163,184,0.35)'],
+      [0.55, 'rgba(100,116,139,0.55)'],
+      [0.8, 'rgba(71,85,105,0.7)'],
       [1, 'rgba(51,65,85,0.8)'],
     ],
-    lowLabel: 'Clear',
-    highLabel: 'Overcast',
+    bands: [
+      { label: 'Partly', range: '25–50%', color: '#CBD5E1' },
+      { label: 'Mostly', range: '50–75%', color: '#94A3B8' },
+      { label: 'Overcast', range: '75%+', color: '#475569' },
+    ],
   },
 };
 
@@ -132,14 +147,4 @@ export function heatColorExpression(config: WeatherLayerConfig, hour: number): E
     maximum, 1,
   ];
   return ['interpolate', ['linear'], weight, 0, 'rgba(255,255,255,0)', ...config.ramp.flat()] as ExpressionSpecification;
-}
-
-/** CSS gradient matching the ramp, without its transparent first stop. */
-export function legendGradient(config: WeatherLayerConfig): string {
-  const visibleStops = config.ramp.slice(1);
-  const firstWeight = visibleStops[0][0];
-  const cssStops = visibleStops.map(
-    ([weight, color]) => `${color} ${(((weight - firstWeight) / (1 - firstWeight)) * 100).toFixed(0)}%`,
-  );
-  return `linear-gradient(to right, ${cssStops.join(', ')})`;
 }

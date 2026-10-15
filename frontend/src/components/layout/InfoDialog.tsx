@@ -121,16 +121,18 @@ export function HelpContent() {
       <div>
         <h3 className="text-card text-ink">Weather layers and the forecast slider</h3>
         <p className="mt-1">
-          Use the layer list on the map to show combined weather, wind, precipitation, snow, or clouds. Drag the slider to
-          see conditions from departure up to 48 hours later. The slider changes the map only; each checkpoint’s risk
-          always uses the forecast at the truck’s arrival time.
+          Use the layer list on the map to show combined weather, wind, precipitation, snow, or clouds. Point at the
+          map, or tap it on a phone, to read the weather there in words. Drag the slider to see conditions from
+          departure up to 48 hours later. The slider changes the map only; each checkpoint’s risk always uses the
+          forecast at the truck’s arrival time.
         </p>
       </div>
       <div>
         <h3 className="text-card text-ink">Map colors</h3>
         <p className="mt-1">
           Routes 1, 2, and 3 are blue, green, and red. Dots on the selected route are colored by risk: green Low, yellow
-          Moderate, orange High, red Severe, dark red No Travel.
+          Moderate, orange High, red Severe, dark red No Travel. Weather on the map uses the same scale: light blue for
+          light weather, then yellow, orange, and red as it reaches the Moderate, High, and Severe thresholds.
         </p>
       </div>
     </div>
