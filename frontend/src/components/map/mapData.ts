@@ -1,6 +1,5 @@
 import type { FeatureCollection, LineString, Point } from 'geojson';
 import type { RouteResult, WeatherGrid, WeatherVariable } from '../../types/routing';
-import { routeColor } from '../../styles/tokens';
 import { valueToWeight, WEATHER_LAYERS } from './weatherLayers';
 import type { WeatherLayer } from './weatherLayers';
 
@@ -8,13 +7,11 @@ export interface RouteFeatureProps {
   route_id: string;
   label: string;
   name: string;
-  color: string;
 }
 
 export interface CheckpointFeatureProps {
   id: string;
   route_id: string;
-  color: string;
   risk: string;
   index: number;
   eta: string;
@@ -28,25 +25,37 @@ export const emptyCollection = <G extends LineString | Point, P>(): FeatureColle
 export function routesToGeoJSON(routes: RouteResult[]): FeatureCollection<LineString, RouteFeatureProps> {
   return {
     type: 'FeatureCollection',
-    features: routes.map((route, routeIndex) => ({
+    features: routes.map((route) => ({
       type: 'Feature',
       geometry: { type: 'LineString', coordinates: route.geometry },
-      properties: { route_id: route.id, label: route.label, name: route.name, color: routeColor(routeIndex) },
+      properties: { route_id: route.id, label: route.label, name: route.name },
     })),
+  };
+}
+
+export function segmentsToGeoJSON(routes: RouteResult[]): FeatureCollection<LineString, { route_id: string; risk: string }> {
+  return {
+    type: 'FeatureCollection',
+    features: routes.flatMap((route) =>
+      route.segments.map((segment) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'LineString' as const, coordinates: segment.coordinates },
+        properties: { route_id: route.id, risk: segment.risk },
+      })),
+    ),
   };
 }
 
 export function checkpointsToGeoJSON(routes: RouteResult[]): FeatureCollection<Point, CheckpointFeatureProps> {
   return {
     type: 'FeatureCollection',
-    features: routes.flatMap((route, routeIndex) =>
+    features: routes.flatMap((route) =>
       route.checkpoints.map((checkpoint) => ({
         type: 'Feature' as const,
         geometry: { type: 'Point' as const, coordinates: checkpoint.location },
         properties: {
           id: checkpoint.id,
           route_id: route.id,
-          color: routeColor(routeIndex),
           risk: checkpoint.risk,
           index: checkpoint.index,
           eta: checkpoint.eta,

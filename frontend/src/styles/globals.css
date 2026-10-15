@@ -226,3 +226,72 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Route labels and truck marker on the map */
+.route-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 9px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-hover);
+  font: 500 11px/15px var(--font-sans);
+  color: var(--color-ink-secondary);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 150ms ease-out, color 150ms ease-out, border-color 150ms ease-out;
+}
+
+.route-label strong {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.route-label:hover {
+  border-color: var(--color-line-strong);
+}
+
+.route-label--selected {
+  z-index: 2;
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: #cbd5e1;
+}
+
+.route-label--selected strong {
+  color: #ffffff;
+}
+
+.truck-marker {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: var(--color-ink);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.4);
+}
+
+/* Dashboard grid: stacked on small screens, one screen with a sidebar on desktop */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "form" "map" "routes" "panel";
+}
+
+@media (min-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 360px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "form map"
+      "routes map"
+      "routes panel";
+  }
+}

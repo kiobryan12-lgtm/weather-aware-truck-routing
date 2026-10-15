@@ -42,7 +42,7 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
 export function CheckpointDetails({ checkpoint, departureTime }: CheckpointDetailsProps) {
   if (!checkpoint) {
     return (
-      <section className="flex min-h-40 items-center justify-center rounded-card border border-line bg-surface p-4 text-center text-body text-ink-muted shadow-card">
+      <section className="flex h-full items-center justify-center p-4 text-center text-body text-ink-muted">
         Select a checkpoint in the table or on the map to see its weather details.
       </section>
     );
@@ -53,15 +53,15 @@ export function CheckpointDetails({ checkpoint, departureTime }: CheckpointDetai
   const ExplanationIcon = risk === 'low' ? CheckCircle2 : risk === 'unknown' ? HelpCircle : AlertTriangle;
 
   return (
-    <section aria-labelledby="checkpoint-details-heading" aria-live="polite" className="rounded-card border border-line bg-surface p-4 shadow-card">
+    <section aria-labelledby="checkpoint-details-heading" aria-live="polite" className="p-4">
       <div className="flex items-center justify-between gap-2">
-        <h2 id="checkpoint-details-heading" className="text-section text-ink">
-          Checkpoint {checkpoint.index + 1} Details
-        </h2>
+        <h3 id="checkpoint-details-heading" className="text-card text-ink">
+          Checkpoint {checkpoint.index + 1}
+        </h3>
         <RiskBadge level={risk} variant="solid" withSuffix />
       </div>
 
-      <dl className="mt-3 flex flex-col gap-1 text-body tabular-nums">
+      <dl className="mt-2 flex flex-col gap-0.5 text-label tabular-nums">
         <DetailRow label="Distance from start">{formatMiles(checkpoint.distance_mi).replace(' mi', ' miles')}</DetailRow>
         <DetailRow label="Estimated arrival">
           {formatDateTime(checkpoint.eta)} <span className="text-ink-muted">(in {formatDuration(minutesFromDeparture)})</span>
@@ -82,13 +82,13 @@ export function CheckpointDetails({ checkpoint, departureTime }: CheckpointDetai
         <span className="sr-only">(opens in a new tab)</span>
       </a>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className="mt-3 grid grid-cols-3 gap-2">
         <WeatherTile icon={<Wind aria-hidden />} label="Wind" value={formatWind(weather.wind_mph)} level={levels.wind} />
         <WeatherTile icon={<CloudRain aria-hidden />} label="Rain" value={formatRate(weather.rain_in_hr)} level={levels.rain} />
         <WeatherTile icon={<Snowflake aria-hidden />} label="Snow" value={formatRate(weather.snow_in_hr)} level={levels.snow} />
       </div>
 
-      <div className={cn('mt-4 rounded-control px-3 py-2.5', RISK_TINT_CLASSES[risk])}>
+      <div className={cn('mt-3 rounded-control px-3 py-2', RISK_TINT_CLASSES[risk])}>
         <p className="flex items-center gap-1.5 text-body font-semibold">
           <ExplanationIcon className="size-4 shrink-0" aria-hidden />
           {risk === 'unknown' ? 'Forecast unavailable' : `Why this is ${RISK_LABELS[risk]}${risk === 'no_travel' ? '' : ' Risk'}?`}

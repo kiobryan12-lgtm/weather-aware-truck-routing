@@ -2,17 +2,22 @@ import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, Layers } from 'lucide-react';
 import { cn } from '../../lib/cn';
+import type { RiskLevel } from '../../types/routing';
+import { RISK_LABELS } from '../../lib/risk';
+import { RISK_COLORS } from '../../styles/tokens';
 import { WEATHER_LAYER_OPTIONS } from './weatherLayers';
 import type { WeatherLayer } from './weatherLayers';
+
+const ROUTE_RISK_LEVELS: RiskLevel[] = ['low', 'moderate', 'high', 'severe', 'no_travel'];
 
 interface MapLayerControlsProps {
   value: WeatherLayer;
   onChange: (value: WeatherLayer) => void;
-  // Shown in the panel on small screens instead of the floating legend.
-  mobileLegend?: ReactNode;
+  // Shown in the panel when the floating legend is hidden (below 2xl).
+  compactLegend?: ReactNode;
 }
 
-export function MapLayerControls({ value, onChange, mobileLegend }: MapLayerControlsProps) {
+export function MapLayerControls({ value, onChange, compactLegend }: MapLayerControlsProps) {
   const groupLabelId = useId();
   const panelId = useId();
   const [open, setOpen] = useState(false);
@@ -34,7 +39,7 @@ export function MapLayerControls({ value, onChange, mobileLegend }: MapLayerCont
       <div
         id={panelId}
         className={cn(
-          'mt-2 max-h-[324px] w-[185px] overflow-y-auto rounded-panel border border-line bg-surface p-2 shadow-float md:mt-0 md:block md:max-h-none md:overflow-visible',
+          'mt-2 max-h-[324px] w-[185px] overflow-y-auto rounded-panel border border-line bg-surface p-2 shadow-float md:mt-0 md:block md:max-h-[360px] 2xl:max-h-none 2xl:overflow-visible',
           !open && 'hidden',
         )}
       >
@@ -75,7 +80,22 @@ export function MapLayerControls({ value, onChange, mobileLegend }: MapLayerCont
             );
           })}
         </div>
-        {mobileLegend && <div className="mt-2 border-t border-line px-1 pt-2 md:hidden">{mobileLegend}</div>}
+        <div className="mt-2 border-t border-line px-1 pt-2">
+          <p className="text-meta font-semibold text-ink">Route risk</p>
+          <ul className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5">
+            {ROUTE_RISK_LEVELS.map((level) => (
+              <li key={level} className="flex items-center gap-1.5 text-meta text-ink-secondary">
+                <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: RISK_COLORS[level] }} aria-hidden />
+                {RISK_LABELS[level]}
+              </li>
+            ))}
+            <li className="flex items-center gap-1.5 text-meta text-ink-secondary">
+              <span className="h-1 w-2.5 shrink-0 rounded-full bg-[#94A3B8]" aria-hidden />
+              Other routes
+            </li>
+          </ul>
+        </div>
+        {compactLegend && <div className="mt-2 border-t border-line px-1 pt-2 2xl:hidden">{compactLegend}</div>}
       </div>
     </div>
   );

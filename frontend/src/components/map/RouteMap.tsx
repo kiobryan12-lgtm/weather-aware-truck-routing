@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, PointLike, StyleSpecification } from 'maplibre-gl';
-import type { AnalyzeResponse } from '../../types/routing';
-import { boundsOf } from '../../lib/geo';
-import { formatTime, formatWeekdayTime } from '../../lib/format';
+import type { AnalyzeResponse, LngLat, RouteResult } from '../../types/routing';
+import { boundsOf, cumulativeMiles, pointAtDistance } from '../../lib/geo';
+import { formatDuration, formatMiles, formatTime, formatWeekdayTime } from '../../lib/format';
 import { describePointWeather } from '../../lib/weatherText';
 import { RISK_LABELS } from '../../lib/risk';
 import { MAP_COLORS } from '../../styles/tokens';
 import { Spinner } from '../common/LoadingState';
 import { addRouteLayers, applyHeatGridSpacing, applyRouteSelection, LAYERS, SOURCES } from './mapLayers';
-import { checkpointsToGeoJSON, nearestGridPointIndex, routesToGeoJSON, weatherGridToGeoJSON } from './mapData';
+import { checkpointsToGeoJSON, nearestGridPointIndex, routesToGeoJSON, segmentsToGeoJSON, weatherGridToGeoJSON } from './mapData';
 import type { CheckpointFeatureProps, RouteFeatureProps } from './mapData';
 import { heatColorExpression, WEATHER_LAYERS } from './weatherLayers';
 import type { WeatherLayer } from './weatherLayers';
@@ -42,6 +42,42 @@ function createMarkerPin(color: string, labelSide: 'left' | 'right'): { element:
   return { element, label };
 }
 
+// Spread the labels along the routes so they don't sit on top of each other.
+const LABEL_POSITIONS = [0.38, 0.52, 0.66];
+
+function labelAnchor(route: RouteResult, index: number): LngLat {
+  const cumulative = cumulativeMiles(route.geometry);
+  return pointAtDistance(route.geometry, cumulative, cumulative[cumulative.length - 1] * LABEL_POSITIONS[index % 3]);
+}
+
+function fillRouteLabel(element: HTMLElement, route: RouteResult, recommended: boolean, selected: boolean): void {
+  const miles = route.risk_summary.miles_by_level;
+  const title = `Route ${route.label}${recommended ? ' ★ Recommended' : ''}`;
+  const lines = [
+    `${formatMiles(route.distance_mi)} · ${formatDuration(route.duration_min)}`,
+    miles.no_travel > 0
+      ? `No Travel ${formatMiles(miles.no_travel)}`
+      : `Severe ${formatMiles(miles.severe)} · High ${formatMiles(miles.high)}`,
+  ];
+  element.className = `route-label${selected ? ' route-label--selected' : ''}`;
+  element.replaceChildren(
+    Object.assign(document.createElement('strong'), { textContent: title }),
+    ...lines.map((line) => Object.assign(document.createElement('span'), { textContent: line })),
+  );
+  element.setAttribute('aria-pressed', String(selected));
+  element.setAttribute('aria-label', `${title}. ${lines.join('. ')}`);
+}
+
+function createTruckMarker(): maplibregl.Marker {
+  const element = document.createElement('div');
+  element.className = 'truck-marker';
+  element.setAttribute('role', 'img');
+  element.setAttribute('aria-label', 'Truck position at the selected forecast time');
+  element.innerHTML =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>';
+  return new maplibregl.Marker({ element });
+}
+
 type MapHit =
   | { kind: 'route'; props: RouteFeatureProps }
   | { kind: 'checkpoint'; props: CheckpointFeatureProps };
@@ -54,6 +90,7 @@ interface RouteMapProps {
   selectedCheckpointId: string | null;
   weatherLayer: WeatherLayer;
   forecastHour: number;
+  truckLocation: LngLat | null;
   onSelectRoute: (routeId: string) => void;
   onSelectCheckpoint: (routeId: string, checkpointId: string) => void;
   children?: ReactNode;
@@ -67,6 +104,7 @@ export function RouteMap({
   selectedCheckpointId,
   weatherLayer,
   forecastHour,
+  truckLocation,
   onSelectRoute,
   onSelectCheckpoint,
   children,
@@ -82,6 +120,8 @@ export function RouteMap({
   } | null>(null);
   const selectedCheckpointRef = useRef<string | null>(null);
   const heatmapFrameRef = useRef(0);
+  const routeLabelsRef = useRef<{ routeId: string; element: HTMLElement; marker: maplibregl.Marker }[]>([]);
+  const truckMarkerRef = useRef<maplibregl.Marker | null>(null);
 
   const forecastHourRef = useRef(forecastHour);
 
@@ -174,7 +214,7 @@ export function RouteMap({
         [point.x + 6, point.y + 6],
       ];
       const checkpoint = map.queryRenderedFeatures(hitBox, {
-        layers: [LAYERS.checkpointsSelected, LAYERS.checkpointsOther],
+        layers: [LAYERS.checkpointsSelected, LAYERS.checkpointsAlternative],
       })[0];
       if (checkpoint) return { kind: 'checkpoint', props: checkpoint.properties as CheckpointFeatureProps };
       const route = map.queryRenderedFeatures([point.x, point.y], { layers: [LAYERS.routesHit] })[0];
@@ -267,6 +307,7 @@ export function RouteMap({
     if (!ready || !map) return;
     const routes = data?.routes ?? [];
     (map.getSource(SOURCES.routes) as GeoJSONSource).setData(routesToGeoJSON(routes));
+    (map.getSource(SOURCES.segments) as GeoJSONSource).setData(segmentsToGeoJSON(routes));
     (map.getSource(SOURCES.checkpoints) as GeoJSONSource).setData(checkpointsToGeoJSON(routes));
     (map.getSource(SOURCES.heat) as GeoJSONSource).setData(weatherGridToGeoJSON(data?.weather_grid ?? null));
     if (data?.weather_grid) applyHeatGridSpacing(map, data.weather_grid.spacing_deg);
@@ -291,11 +332,12 @@ export function RouteMap({
       const { clientWidth: width } = map.getContainer();
       const compact = width < 640;
       map.fitBounds(bounds, {
+        // Room for the route labels, the forecast slider (bottom) and the layer panel (right).
         padding: {
-          top: compact ? 64 : 56,
-          bottom: compact ? 96 : 104,
-          left: compact ? 76 : 110,
-          right: compact ? 76 : width > 900 ? 230 : 110,
+          top: 80,
+          bottom: compact ? 110 : 140,
+          left: compact ? 56 : 110,
+          right: compact ? 56 : width > 900 ? 300 : 110,
         },
         maxZoom: 8,
         duration: prefersReducedMotion() ? 0 : 800,
@@ -309,6 +351,44 @@ export function RouteMap({
     applyRouteSelection(map, selectedRouteId ?? '');
   }, [ready, selectedRouteId, data]);
 
+  // Route labels: recreated for new results, restyled when the selection changes.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    routeLabelsRef.current.forEach(({ marker }) => marker.remove());
+    routeLabelsRef.current = (data?.routes ?? []).map((route, index) => {
+      const element = document.createElement('button');
+      element.type = 'button';
+      element.addEventListener('click', (event) => {
+        event.stopPropagation();
+        handlersRef.current.onSelectRoute(route.id);
+      });
+      const marker = new maplibregl.Marker({ element, anchor: 'bottom', offset: [0, -10] })
+        .setLngLat(labelAnchor(route, index))
+        .addTo(map);
+      return { routeId: route.id, element, marker };
+    });
+    return () => routeLabelsRef.current.forEach(({ marker }) => marker.remove());
+  }, [ready, data]);
+
+  useEffect(() => {
+    for (const { routeId, element } of routeLabelsRef.current) {
+      const route = data?.routes.find((candidate) => candidate.id === routeId);
+      if (route) fillRouteLabel(element, route, data?.recommendation.route_id === routeId, routeId === selectedRouteId);
+    }
+  }, [ready, data, selectedRouteId]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    if (!truckLocation) {
+      truckMarkerRef.current?.remove();
+      return;
+    }
+    truckMarkerRef.current ??= createTruckMarker();
+    truckMarkerRef.current.setLngLat(truckLocation).addTo(map);
+  }, [ready, truckLocation]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
@@ -319,7 +399,8 @@ export function RouteMap({
     map.setFeatureState({ source: SOURCES.checkpoints, id: selectedCheckpointId }, { selected: true });
 
     const checkpoint = dataRef.current?.routes.flatMap((route) => route.checkpoints).find((checkpoint) => checkpoint.id === selectedCheckpointId);
-    if (checkpoint && !map.getBounds().contains(checkpoint.location)) {
+    // Don't interrupt the fit to new routes.
+    if (checkpoint && !map.isMoving() && !map.getBounds().contains(checkpoint.location)) {
       map.easeTo({ center: checkpoint.location, duration: prefersReducedMotion() ? 0 : 500 });
     }
   }, [ready, selectedCheckpointId, data]);
@@ -341,7 +422,7 @@ export function RouteMap({
   }, [ready, hasGrid, weatherLayer, forecastHour]);
 
   return (
-    <div className="relative h-[400px] overflow-hidden rounded-card border border-line bg-surface-muted shadow-card md:h-[480px] lg:h-full lg:min-h-[500px]">
+    <div className="relative h-[520px] overflow-hidden rounded-card border border-line bg-surface-muted shadow-card md:h-[560px] lg:h-full lg:min-h-[320px]">
       {/* maplibre-gl.css sets position: relative on this element, so absolute inset-0 doesn't work. */}
       <div ref={containerRef} className="h-full w-full" role="region" aria-label="Route map" />
 

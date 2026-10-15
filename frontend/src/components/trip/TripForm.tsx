@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { CalendarDays, MapPin, Search, Truck } from 'lucide-react';
+import { CalendarDays, MapPin, Pencil, Search, Truck } from 'lucide-react';
 import type { CheckpointIntervalMiles, TripRequest } from '../../types/routing';
-import { localTimeZoneLabel, toDateTimeLocalValue } from '../../lib/format';
+import { formatWeekdayTime, localTimeZoneLabel, toDateTimeLocalValue } from '../../lib/format';
 import { Button } from '../common/Button';
 import { Field, TextInput, fieldDescribedBy } from '../common/Input';
 import { LocationInput } from './LocationInput';
@@ -73,9 +73,19 @@ interface TripFormProps {
   loading: boolean;
   onSubmit: (request: TripRequest) => void;
   submitOnMount?: boolean;
+  // Shows a one-line summary instead of the fields, to leave room for the results.
+  collapsed?: boolean;
+  onExpand?: () => void;
 }
 
-export function TripForm({ loading, onSubmit, submitOnMount = false }: TripFormProps) {
+function tripSummary(values: FormValues): string {
+  const departure = new Date(values.departure);
+  const when = Number.isNaN(departure.getTime()) ? '' : formatWeekdayTime(departure);
+  const load = values.loadWeight ? `${Number(values.loadWeight).toLocaleString('en-US')} lb` : '';
+  return [when, load, `every ${values.interval} mi`].filter(Boolean).join(' · ');
+}
+
+export function TripForm({ loading, onSubmit, submitOnMount = false, collapsed = false, onExpand }: TripFormProps) {
   const [values, setValues] = useState<FormValues>(() => ({
     origin: 'Denver, CO, USA',
     destination: 'Kansas City, MO, USA',
@@ -111,12 +121,32 @@ export function TripForm({ loading, onSubmit, submitOnMount = false }: TripFormP
   };
 
   return (
-    <section aria-labelledby="trip-form-heading" className="h-full rounded-card border border-line bg-surface p-4 shadow-card md:p-5">
-      <h2 id="trip-form-heading" className="text-section text-ink">
-        Plan Your Route
-      </h2>
+    <section aria-labelledby="trip-form-heading" className="h-full rounded-card border border-line bg-surface p-4 shadow-card">
+      {collapsed && (
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 id="trip-form-heading" className="truncate text-card text-ink">
+              {values.origin} → {values.destination}
+            </h2>
+            <p className="truncate text-label text-ink-muted tabular-nums">{tripSummary(values)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onExpand}
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-badge px-2 text-label font-semibold text-primary transition-colors duration-150 ease-out hover:bg-primary-light"
+          >
+            <Pencil className="size-3.5" aria-hidden />
+            Edit trip
+          </button>
+        </div>
+      )}
+      {!collapsed && (
+        <h2 id="trip-form-heading" className="text-section text-ink">
+          Plan Your Route
+        </h2>
+      )}
 
-      <form noValidate onSubmit={handleSubmit} className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-1">
+      <form noValidate onSubmit={handleSubmit} hidden={collapsed} className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-1">
         <FieldRow icon={<MapPin />}>
           <LocationInput
             id="trip-origin"

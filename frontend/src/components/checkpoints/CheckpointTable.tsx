@@ -7,14 +7,13 @@ import { RiskBadge } from '../routes/RiskBadge';
 
 interface CheckpointTableProps {
   route: RouteResult;
-  intervalMiles: number;
   selectedCheckpointId: string | null;
   onSelect: (checkpointId: string) => void;
 }
 
 const formatFixed = (value: number | null, digits: number) => (value === null ? '—' : value.toFixed(digits));
 
-export function CheckpointTable({ route, intervalMiles, selectedCheckpointId, onSelect }: CheckpointTableProps) {
+export function CheckpointTable({ route, selectedCheckpointId, onSelect }: CheckpointTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Only scroll the table itself, not the page.
@@ -45,17 +44,8 @@ export function CheckpointTable({ route, intervalMiles, selectedCheckpointId, on
   const cellClass = 'px-3 py-2 whitespace-nowrap';
 
   return (
-    <section aria-labelledby="checkpoint-table-heading" className="flex min-w-0 flex-col rounded-card border border-line bg-surface shadow-card">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-4 pt-4 pb-3">
-        <h2 id="checkpoint-table-heading" className="text-section text-ink">
-          Checkpoints - Route {route.label} ({route.name})
-        </h2>
-        <p className="text-label text-ink-muted">
-          {route.checkpoints.length} checkpoints · every {intervalMiles} mi
-        </p>
-      </div>
-      <div ref={scrollRef} className="relative max-h-[332px] overflow-auto border-t border-line">
-        <table className="w-full min-w-[600px] border-collapse text-body tabular-nums">
+      <div ref={scrollRef} className="relative h-full min-w-0 overflow-auto">
+        <table className="w-full min-w-[560px] border-collapse text-body tabular-nums" aria-label={`Checkpoints on route ${route.label}`}>
           <thead className="sticky top-0 z-[1] bg-surface-muted text-label text-ink-secondary shadow-[0_1px_0_var(--color-line)]">
             <tr>
               <th scope="col" className={headerCellClass}>#</th>
@@ -97,6 +87,5 @@ export function CheckpointTable({ route, intervalMiles, selectedCheckpointId, on
           </tbody>
         </table>
       </div>
-    </section>
   );
 }

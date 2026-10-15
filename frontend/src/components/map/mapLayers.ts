@@ -5,17 +5,19 @@ import { emptyCollection } from './mapData';
 export const SOURCES = {
   heat: 'weather-heat',
   routes: 'routes',
+  segments: 'risk-segments',
   checkpoints: 'checkpoints',
 } as const;
 
 export const LAYERS = {
   heat: 'weather-heat',
-  routesOtherCasing: 'routes-other-casing',
-  routesOther: 'routes-other',
+  alternativeCasing: 'routes-alternative-casing',
+  alternative: 'routes-alternative',
   selectedCasing: 'route-selected-casing',
-  selected: 'route-selected',
+  segments: 'route-selected-risk',
+  segmentsUnknown: 'route-selected-unknown',
   routesHit: 'routes-hit',
-  checkpointsOther: 'checkpoints-other',
+  checkpointsAlternative: 'checkpoints-alternative',
   checkpointsSelected: 'checkpoints-selected',
 } as const;
 
@@ -41,6 +43,7 @@ const excludesRoute = (routeId: string): ExpressionSpecification => ['!=', ['get
 export function addRouteLayers(map: MapLibreMap): void {
   map.addSource(SOURCES.heat, { type: 'geojson', data: emptyCollection() });
   map.addSource(SOURCES.routes, { type: 'geojson', data: emptyCollection(), promoteId: 'route_id' });
+  map.addSource(SOURCES.segments, { type: 'geojson', data: emptyCollection() });
   map.addSource(SOURCES.checkpoints, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
 
   // Added below the basemap labels so place names stay readable.
@@ -55,7 +58,7 @@ export function addRouteLayers(map: MapLibreMap): void {
       layout: { visibility: 'none' },
       paint: {
         'circle-blur': 1,
-        'circle-opacity': ['interpolate', ['linear'], ['zoom'], HEAT_MAX_ZOOM - 1, 0.8, HEAT_MAX_ZOOM, 0],
+        'circle-opacity': ['interpolate', ['linear'], ['zoom'], HEAT_MAX_ZOOM - 1, 0.7, HEAT_MAX_ZOOM, 0],
         'circle-pitch-alignment': 'map',
       },
     },
@@ -64,19 +67,23 @@ export function addRouteLayers(map: MapLibreMap): void {
 
   const lineLayout = { 'line-cap': 'round', 'line-join': 'round' } as const;
 
+  // Alternatives are gray so the selected route stands out.
   map.addLayer({
-    id: LAYERS.routesOtherCasing,
+    id: LAYERS.alternativeCasing,
     type: 'line',
     source: SOURCES.routes,
     layout: lineLayout,
     paint: { 'line-color': MAP_COLORS.casing, 'line-width': ['case', isHovered, 9, 7] },
   });
   map.addLayer({
-    id: LAYERS.routesOther,
+    id: LAYERS.alternative,
     type: 'line',
     source: SOURCES.routes,
     layout: lineLayout,
-    paint: { 'line-color': ['get', 'color'], 'line-width': ['case', isHovered, 5, 4], 'line-opacity': 0.85 },
+    paint: {
+      'line-color': ['case', isHovered, MAP_COLORS.alternativeHover, MAP_COLORS.alternative],
+      'line-width': ['case', isHovered, 5, 4],
+    },
   });
   map.addLayer({
     id: LAYERS.selectedCasing,
@@ -84,15 +91,24 @@ export function addRouteLayers(map: MapLibreMap): void {
     source: SOURCES.routes,
     layout: lineLayout,
     filter: matchesRoute(''),
-    paint: { 'line-color': MAP_COLORS.casing, 'line-width': 10 },
+    paint: { 'line-color': MAP_COLORS.casing, 'line-width': 11 },
   });
+  // The selected route is drawn in pieces, each coloured by its checkpoint's risk.
   map.addLayer({
-    id: LAYERS.selected,
+    id: LAYERS.segments,
     type: 'line',
-    source: SOURCES.routes,
+    source: SOURCES.segments,
     layout: lineLayout,
     filter: matchesRoute(''),
-    paint: { 'line-color': ['get', 'color'], 'line-width': 6 },
+    paint: { 'line-color': riskColor, 'line-width': 6 },
+  });
+  map.addLayer({
+    id: LAYERS.segmentsUnknown,
+    type: 'line',
+    source: SOURCES.segments,
+    layout: { 'line-join': 'round' },
+    filter: matchesRoute(''),
+    paint: { 'line-color': RISK_COLORS.unknown, 'line-width': 6, 'line-dasharray': [1, 1] },
   });
   // Wide invisible line to make routes easier to hover and click.
   map.addLayer({
@@ -103,15 +119,15 @@ export function addRouteLayers(map: MapLibreMap): void {
     paint: { 'line-color': '#000000', 'line-width': 18, 'line-opacity': 0 },
   });
   map.addLayer({
-    id: LAYERS.checkpointsOther,
+    id: LAYERS.checkpointsAlternative,
     type: 'circle',
     source: SOURCES.checkpoints,
     filter: excludesRoute(''),
     paint: {
       'circle-color': MAP_COLORS.casing,
-      'circle-radius': ['case', isHovered, 5, 3.5],
-      'circle-stroke-color': ['get', 'color'],
-      'circle-stroke-width': 2,
+      'circle-radius': ['case', isHovered, 4.5, 3],
+      'circle-stroke-color': MAP_COLORS.alternative,
+      'circle-stroke-width': 1.5,
     },
   });
   map.addLayer({
@@ -129,11 +145,12 @@ export function addRouteLayers(map: MapLibreMap): void {
 }
 
 export function applyRouteSelection(map: MapLibreMap, routeId: string): void {
-  map.setFilter(LAYERS.routesOtherCasing, excludesRoute(routeId));
-  map.setFilter(LAYERS.routesOther, excludesRoute(routeId));
+  map.setFilter(LAYERS.alternativeCasing, excludesRoute(routeId));
+  map.setFilter(LAYERS.alternative, excludesRoute(routeId));
   map.setFilter(LAYERS.selectedCasing, matchesRoute(routeId));
-  map.setFilter(LAYERS.selected, matchesRoute(routeId));
-  map.setFilter(LAYERS.checkpointsOther, excludesRoute(routeId));
+  map.setFilter(LAYERS.segments, ['all', matchesRoute(routeId), ['!=', ['get', 'risk'], 'unknown']]);
+  map.setFilter(LAYERS.segmentsUnknown, ['all', matchesRoute(routeId), ['==', ['get', 'risk'], 'unknown']]);
+  map.setFilter(LAYERS.checkpointsAlternative, excludesRoute(routeId));
   map.setFilter(LAYERS.checkpointsSelected, matchesRoute(routeId));
 }
 
